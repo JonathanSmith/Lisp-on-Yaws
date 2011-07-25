@@ -1,7 +1,7 @@
 (defparameter *yaws-server-node* (cleric-epmd:lookup-node "yaws" "jon-VirtualBox"))
 (defvar *yaws-listener-thread*)
-(defvar *pids-hash* (make-hash-table))
-(defvar *reg-pids-hash* (make-hash-table))
+(defvar *pids-hash* (make-hash-table :test 'equalp))
+(defvar *reg-pids-hash* (make-hash-table :test 'equalp))
 (defvar *pid* (cleric:make-pid))
 ;
 
@@ -15,27 +15,38 @@
 	       (when messages (mapcar dispatch-function messages))))))))
 
 (defmethod hash-dispatch ((control-message cleric:reg-send))
-  (let* ((to-name (cleric:to-name control-message))
-	(fnlambda (gethash to-name *reg-pids-hash*)))
-    (funcall (funcall fnlambda control-message))))
+  (let* ((to-symbol (cleric:to-name control-message))
+	 (to-name (symbol-name to-symbol))
+	 (fnlambda (gethash to-name *reg-pids-hash*)))
+    (when fnlambda
+      (funcall fnlambda control-message))))
 
 (defmethod hash-dispatch ((control-message cleric:send))
   (let* ((to-pid (cleric:to-pid control-message))
-	 (fnlambda (gethash to-pid *pids-hash*)))
+	 (pid-id (pid-id to-pid))
+	 (fnlambda (gethash pid-id *pids-hash*)))
     (when fnlambda (funcall fnlambda control-message))))
+
+(defun pid-id (pid)
+  (slot-value pid 'cleric::id))
 
 (defun init ()
   (cleric:remote-node-connect *yaws-server-node* "foo")
-  (cleric:reg-send *pid* "cleric_listener" "yaws" "Hello, Erlang")
-  ;(node-listener-thread #'hash-dispatch)
-)
+  (node-listener-thread #'hash-dispatch)
+  (let ((pid (set-hash-dispatch #'printmsg)))
+    (register-name #'printmsg "printmsg")
+    ;(cleric:reg-send *pid* "cleric_listener" "yaws" pid)
+    ))
 
-(defun set-hash-dispatch (fn)
-  (let ((pid (cleric:make-pid)))
-    (setf (gethash pid *pids-hash*) fn)
+(defun register-name (fn name)
+  (setf (gethash name *reg-pids-hash*) fn))
+
+(defun set-hash-dispatch (fn &optional (pid (cleric:make-pid)))
+  (let* ((pid-id (pid-id pid)))
+    (setf (gethash pid-id *pids-hash*) fn)
     pid))
 
 (defun printmsg (control-message)
-  (format t "~s~%" control-message))
+  (format t "~s~%" (cleric:message control-message)))
 
 ;(cleric:reg-send *pid* "cleric_listener" "yaws" "Hello, Erlang world!")
