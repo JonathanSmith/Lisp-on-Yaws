@@ -8,8 +8,8 @@ run() ->
     Id = "embedded",
     GConfList = [{id, Id}],
     Docroot = filename:absname("") ++ "/www",
-    Ebin = filename:absname("") ++ "/ebin",
-    SrcDir = filename:absname("") ++ "/src",
+    Ebin = filename:absname("") ++ "/ebin/",
+    SrcDir = filename:absname("") ++ "/src/",
     SConfList = [{port, 8080},
                  {servername, "foobar"},
                  {listen, {0,0,0,0}},
@@ -37,10 +37,15 @@ run() ->
 
 lfe_comp_loop(Ebin,SrcDir) ->
     receive {file,ModuleName, FileData} ->
-    	    ok = file:write_file(SrcDir ++ ModuleName ++ ".lfe", FileData),
-    	    lfe_comp:file(ModuleName,[{outdir,Ebin}]),
+	    io:format("write: ~p ~n",[ModuleName]),
+	    FilePath = SrcDir ++ ModuleName,
+    	    ok = file:write_file(FilePath ++ ".lfe", FileData),
+	    io:format("comp: ~p ~n",[ModuleName]),
+    	    lfe_comp:file(FilePath,[{outdir,Ebin}]),
 	    ModuleAtom = list_to_atom(ModuleName),
+	    io:format("load: ~p ~n",[ModuleName]),
       	    code:load_file(ModuleAtom),
+	    io:format("done: ~p ~n",[ModuleName]),
 	    lfe_comp_loop(Ebin,SrcDir)
     end.
 
@@ -112,5 +117,9 @@ conf_loop(Docroot, SConfList, GConfList, Id) ->
 		    conf_loop(Docroot, SConfList, GConfList, Id)
 	    end;
 	{ping, PID} ->
-	    PID ! {pong,self()}
+	    PID ! {pong,self()},
+	     conf_loop(Docroot, SConfList, GConfList, Id);
+	ANYTHING ->
+	    io:format("wrong command: ~p ~n",[ANYTHING]),
+	    conf_loop(Docroot, SConfList, GConfList, Id)
     end.
