@@ -7,7 +7,9 @@ start() ->
 run() ->
     Id = "embedded",
     GConfList = [{id, Id}],
-    Docroot = "/home/jon/common-yaws/www",
+    Docroot = filename:absname("") ++ "/www",
+    Ebin = filename:absname("") ++ "/ebin",
+    SrcDir = filename:absname("") ++ "/src",
     SConfList = [{port, 8080},
                  {servername, "foobar"},
                  {listen, {0,0,0,0}},
@@ -16,14 +18,31 @@ run() ->
    [ supervisor:start_child(ybed_sup, Ch)  || Ch <- ChildSpecs ],
     yaws_api:setconf(GC, SCList),
     ConfControl = spawn(?MODULE, conf_loop, [Docroot, SConfList, GConfList, Id]),
-    case register(confcontrol,ConfControl) of
+    case register(conf_control,ConfControl) of
 	badarg ->
-	    unregister(confcontrol),
-	    register(confcontrol,ConfControl);
+	    unregister(conf_control),
+	    register(conf_control,ConfControl);
 	true ->
 	    ok		
-    end,	
+    end,
+    CompControl = spawn(?MODULE, lfe_comp_loop, [Ebin,SrcDir]),
+    case register(lfe_compiler,CompControl) of
+	badarg ->
+	    unregister(lfe_compiler),
+	    register(lfe_compiler,CompControl);
+	true ->
+	    ok
+    end,
     {ok, self()}.
+
+lfe_comp_loop(Ebin,SrcDir) ->
+    receive {file,ModuleName, FileData} ->
+    	    ok = file:write_file(SrcDir ++ ModuleName ++ ".lfe", FileData),
+    	    lfe_comp:file(ModuleName,[{outdir,Ebin}]),
+	    ModuleAtom = list_to_atom(ModuleName),
+      	    code:load_file(ModuleAtom),
+	    lfe_comp_loop(Ebin,SrcDir)
+    end.
 
 conf_loop(Docroot, SConfList, GConfList, Id) ->
     receive

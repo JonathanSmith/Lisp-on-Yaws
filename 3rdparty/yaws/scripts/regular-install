@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# Used by scripts/Makefile and scripts/rebar-pre-script to
+# install yaws
+
+rm -rf /tmp/yaws 2>/dev/null
+
+set -e
+
+./Install "${PREFIX}" "${ERL}" "${WERL}" "${ETCDIR}/" \
+    "${VARDIR}/" "${ERLBINDIR}/" "${DESTDIR}"
+
+conffile="${DESTDIR}${ETCDIR}/yaws/yaws.conf"
+if [ -f "$conffile" ]; then
+    echo "Keeping old config file $conffile"
+    cp yaws.conf "${conffile}.template"
+else
+    echo "Installing $conffile"
+    if [ -n "$DESTDIR" ]; then
+        [ -d "$DESTDIR" ] || mkdir "$DESTDIR"
+    fi
+    [ -d "${DESTDIR}${ETCDIR}" ] || mkdir "${DESTDIR}${ETCDIR}"
+    [ -d "${DESTDIR}${ETCDIR}/yaws" ] || mkdir "${DESTDIR}${ETCDIR}/yaws"
+    cp yaws.conf "$conffile"
+fi
+cp ../ssl/yaws-cert.pem "${DESTDIR}${ETCDIR}/yaws"
+cp ../ssl/yaws-key.pem "${DESTDIR}${ETCDIR}/yaws"
+
+exit 0
