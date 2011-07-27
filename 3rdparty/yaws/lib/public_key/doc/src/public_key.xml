@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<!DOCTYPE erlref SYSTEM "erlref.dtd">
+
+<erlref>
+  <header>
+    <copyright>
+      <year>2008</year>
+      <year>2011</year>
+      <holder>Ericsson AB, All Rights Reserved</holder>
+    </copyright>
+    <legalnotice>
+  The contents of this file are subject to the Erlang Public License,
+  Version 1.1, (the "License"); you may not use this file except in
+  compliance with the License. You should have received a copy of the
+  Erlang Public License along with this software. If not, it can be
+  retrieved online at http://www.erlang.org/.
+
+  Software distributed under the License is distributed on an "AS IS"
+  basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+  the License for the specific language governing rights and limitations
+  under the License.
+
+  The Initial Developer of the Original Code is Ericsson AB.
+    </legalnotice>
+
+    <title>public_key</title>
+    <prepared>Ingela Anderton Andin</prepared>
+    <responsible></responsible>
+    <docno></docno>
+    <date></date>
+    <rev></rev>
+  </header>
+  <module>public_key</module>
+  <modulesummary> API module for public key infrastructure.</modulesummary>
+  <description>
+    <p>This module provides functions to handle public key infrastructure
+    from RFC 5280 - X.509 certificates and some parts of the PKCS-standard.
+    </p>
+  </description>
+
+  <section>
+    <title>COMMON DATA TYPES </title> 
+    
+    <note><p>All records used in this manual 
+    <!--     except #policy_tree_node{}  -->
+    are generated from ASN.1 specifications
+    and are documented in the User's Guide. See <seealso 
+    marker="public_key_records">Public key records</seealso> and <seealso 
+    marker="cert_records">X.509 Certificate records</seealso>. 
+    </p></note>
+    
+    <p>Use the following include directive to get access to the 
+    records and constant macros described here and in the User's Guide.</p>
+    
+    <code> -include_lib("public_key/include/public_key.hrl"). </code>
+
+    <p><em>Data Types </em></p> 
+    
+    <p><code>boolean() = true | false</code></p>
+
+    <p><code>string = [bytes()]</code></p>
+   
+    <p><code>pki_asn1_type() = 'Certificate' | 'RSAPrivateKey'| 'RSAPublicKey'
+    'DSAPrivateKey' | 'DSAPublicKey' | 'DHParameter' | 'SubjectPublicKeyInfo'</code></p>
+    
+    <p><code>pem_entry () = {pki_asn1_type(), binary() %% DER or encrypted DER
+          not_encrypted | {"DES-CBC" | "DES-EDE3-CBC",  crypto:rand_bytes(8)}}.</code></p>
+    
+    <p><code>rsa_public_key()  = #'RSAPublicKey'{}</code></p>
+
+    <p><code>rsa_private_key() = #'RSAPrivateKey'{} </code></p>
+
+    <p><code>dsa_public_key() = {integer(),  #'Dss-Parms'{}} </code></p>
+
+    <p><code>rsa_private_key() = #'RSAPrivateKey'{} </code></p>
+    
+    <p><code>dsa_private_key() = #'DSAPrivateKey'{}</code></p>
+    
+    <p><code> public_crypt_options() = [{rsa_pad, rsa_padding()}]. </code></p>
+
+    <p><code> rsa_padding() =  'rsa_pkcs1_padding' | 'rsa_pkcs1_oaep_padding'
+    | 'rsa_no_padding'</code></p>
+    
+    <p><code> rsa_digest_type()  = 'md5' | 'sha' </code></p>
+
+    <p><code> dss_digest_type()  = 'none' | 'sha' </code></p>
+
+    <p><code> ssh_file()  = openssh_public_key | rfc4716_public_key |
+    known_hosts | auth_keys </code></p>
+    
+<!--     <p><code>policy_tree() = [Root, Children]</code></p> -->
+    
+<!--     <p><code>Root = #policy_tree_node{}</code></p>    -->
+
+<!--     <p><code>Children = [] | policy_tree()</code></p> -->
+	
+<!--     <p> The policy_tree_node record has the following fields:</p> -->
+    
+<!--     <taglist> -->
+      
+<!--       <tag>valid_policy</tag> -->
+<!--       <item> Is a single policy OID representing a -->
+<!--          valid policy for the path of length x.</item> -->
+      
+<!--       <tag>qualifier_set</tag> -->
+<!--       <item>A set of policy qualifiers associated -->
+<!--          with the valid policy in certificate x.</item> -->
+      
+<!--       <tag>critically_indicator</tag> -->
+<!--       <item>The critically_indicator indicates whether the -->
+<!--          certificate policy extension in certificate x was marked as -->
+<!--          critical. </item> -->
+      
+<!--       <tag>expected_policy_set</tag> -->
+<!--       <item>The expected_policy_set contains one or more policy OIDs -->
+<!--          that would satisfy this policy in the certificate x+1. </item>         -->
+<!--     </taglist> -->
+  </section> 
+
+<funcs>    
+
+  <func>
+    <name>decrypt_private(CipherText, Key [, Options]) -> binary()</name>
+    <fsummary>Public key decryption.</fsummary>
+    <type>
+      <v>CipherText = binary()</v>
+      <v>Key = rsa_private_key()</v>
+      <v>Options = public_crypt_options()</v>
+  </type> 
+  <desc> 
+    <p>Public key decryption using the private key.</p> 
+  </desc> 
+  </func>
+
+  <func>
+    <name>decrypt_public(CipherText, Key [, Options]) - > binary()</name>
+    <fsummary></fsummary>
+    <type>
+      <v>CipherText = binary()</v>
+      <v>Key = rsa_public_key()</v>
+      <v>Options = public_crypt_options()</v>
+  </type> 
+  <desc> 
+    <p> Public key decryption using the public key.</p> 
+  </desc> 
+  </func> 
+
+  <func>
+    <name>der_decode(Asn1type, Der) -> term()</name>
+    <fsummary> Decodes a public key asn1 der encoded entity.</fsummary>
+    <type>
+      <v>Asn1Type = atom() -</v>
+      <d> ASN.1 type present in the public_key applications
+      asn1 specifications.</d>
+      <v>Der = der_encoded()</v>
+    </type> 
+    <desc> 
+      <p> Decodes a public key ASN.1 der encoded entity.</p>
+    </desc> 
+  </func>
+    
+  <func>
+    <name>der_encode(Asn1Type, Entity) -> der_encoded()</name>
+    <fsummary> Encodes a public key entity with asn1 DER encoding.</fsummary>
+    <type>
+      <v>Asn1Type = atom()</v>
+      <d> Asn1 type present in the public_key applications
+	 ASN.1 specifications.</d>
+      <v>Entity = term() - The erlang representation of <c> Asn1Type</c></v>
+  </type> 
+  <desc> 
+    <p> Encodes a public key entity with ASN.1 DER encoding.</p>
+  </desc> 
+  </func>
+
+  <func>
+    <name>pem_decode(PemBin) -> [pem_entry()]</name>
+    <fsummary>Decode PEM binary data and return
+    entries as ASN.1 der encoded entities. </fsummary>
+    <type>
+      <v>PemBin = binary()</v>
+      <d>Example {ok, PemBin} = file:read_file("cert.pem").</d>
+    </type> 
+  <desc> 
+    <p>Decode PEM binary data and return
+    entries as ASN.1 der encoded entities.</p>
+  </desc> 
+  </func> 
+    
+   <func>
+    <name>pem_encode(PemEntries) -> binary()</name>
+    <fsummary>Creates a PEM binary</fsummary>
+    <type>
+      <v> PemEntries = [pem_entry()] </v> 
+  </type> 
+  <desc> 
+    <p>Creates a PEM binary</p> 
+  </desc> 
+  </func>
+
+   <func>
+    <name>pem_entry_decode(PemEntry [, Password]) -> term()</name>
+    <fsummary>Decodes a pem entry.</fsummary>
+    <type>
+      <v> PemEntry = pem_entry() </v> 
+      <v> Password = string() </v> 
+  </type> 
+  <desc> 
+    <p>Decodes a pem entry. pem_decode/1 returns a list of pem
+    entries. Note that if the pem entry is of type
+    'SubjectPublickeyInfo' it will be further decoded to an
+    rsa_public_key() or dsa_public_key().</p>
+  </desc> 
+  </func>
+
+   <func>
+    <name>pem_entry_encode(Asn1Type, Entity [,{CipherInfo, Password}]) -> pem_entry()</name>
+    <fsummary> Creates a pem entry that can be fed to pem_encode/1.</fsummary>
+    <type>
+      <v>Asn1Type = pki_asn1_type()</v>
+      <v>Entity = term() - The Erlang representation of
+      <c>Asn1Type</c>.  If <c>Asn1Type</c> is 'SubjectPublicKeyInfo'
+      then <c>Entity</c> must be either an rsa_public_key() or a
+      dsa_public_key() and this function will create the appropriate
+      'SubjectPublicKeyInfo' entry.
+      </v>
+      <v>CipherInfo = {"DES-CBC" | "DES-EDE3-CBC",  crypto:rand_bytes(8)}</v>
+      <v>Password = string()</v> 
+  </type> 
+  <desc> 
+    <p> Creates a pem entry that can be feed to pem_encode/1.</p> 
+  </desc> 
+  </func>
+
+  <func>
+    <name>encrypt_private(PlainText, Key) -> binary()</name>
+    <fsummary> Public key encryption using the private key.</fsummary>
+    <type>
+      <v>PlainText = binary()</v>
+      <v>Key = rsa_private_key()</v> 
+  </type> 
+  <desc> 
+    <p> Public key encryption using the private key.</p> 
+  </desc> 
+  </func>   
+
+  <func>
+    <name>encrypt_public(PlainText, Key) -> binary()</name>
+    <fsummary> Public key encryption using the public key.</fsummary>
+    <type>
+      <v>PlainText = binary()</v>
+      <v>Key = rsa_public_key()</v> 
+  </type> 
+  <desc> 
+    <p> Public key encryption using the public key.</p> 
+  </desc> 
+  </func>   
+  
+  <func>
+    <name>pkix_decode_cert(Cert, otp|plain) ->  #'Certificate'{} | #'OTPCertificate'{}</name>
+    <fsummary> Decodes an ASN.1 der encoded pkix x509 certificate.</fsummary>
+    <type>
+      <v>Cert = der_encoded()</v> 
+  </type> 
+  <desc> 
+    <p>Decodes an ASN.1 der encoded pkix certificate.  The otp option
+    will use the customized ASN.1 specification OTP-PKIX.asn1 for
+    decoding and also recursively decode most of the standard
+    parts.</p>
+  </desc> 
+  </func>
+
+  <func>
+    <name>pkix_encode(Asn1Type, Entity, otp | plain) -> der_encoded()</name>
+    <fsummary>Der encodes a pkix x509 certificate or part of such a
+    certificate.</fsummary>
+    <type>
+      <v>Asn1Type = atom()</v>
+      <d>The ASN.1 type can be 'Certificate', 'OTPCertificate' or a subtype of either .</d>
+  </type> 
+  <desc> 
+    <p>Der encodes a pkix x509 certificate or part of such a
+    certificate. This function must be used for encoding certificates or parts of certificates
+    that are decoded/created on the otp format, whereas for the plain format this
+    function will directly call der_encode/2. </p> 
+  </desc> 
+  </func>
+
+ <func>
+    <name>pkix_is_issuer(Cert, IssuerCert) -> boolean()</name>
+    <fsummary> Checks if <c>IssuerCert</c> issued <c>Cert</c> </fsummary>
+    <type>
+      <v>Cert = der_encode() | #'OTPCertificate'{}</v> 
+      <v>IssuerCert = der_encode() | #'OTPCertificate'{}</v> 
+  </type> 
+  <desc> 
+    <p> Checks if <c>IssuerCert</c> issued <c>Cert</c> </p> 
+  </desc> 
+  </func>
+  
+  <func>
+    <name>pkix_is_fixed_dh_cert(Cert) -> boolean()</name>
+    <fsummary> Checks if a Certificate is a fixed Diffie-Hellman Cert.</fsummary>
+    <type>
+        <v>Cert = der_encode() | #'OTPCertificate'{}</v> 
+  </type> 
+  <desc> 
+    <p> Checks if a Certificate is a fixed Diffie-Hellman Cert.</p> 
+  </desc> 
+  </func>  
+  
+  <func>
+    <name>pkix_is_self_signed(Cert) -> boolean()</name>
+    <fsummary> Checks if a Certificate is self signed.</fsummary>
+    <type>
+       <v>Cert = der_encode() | #'OTPCertificate'{}</v> 
+  </type> 
+  <desc> 
+    <p> Checks if a Certificate is self signed.</p> 
+  </desc> 
+  </func>
+
+  <func>
+    <name>pkix_issuer_id(Cert, IssuedBy) -> {ok, IssuerID} | {error, Reason}</name>
+    <fsummary> Returns the issuer id.</fsummary>
+    <type>
+        <v>Cert = der_encode() | #'OTPCertificate'{}</v>
+	<v>IssuedBy = self | other</v>
+	<v>IssuerID = {integer(), {rdnSequence, [#'AttributeTypeAndValue'{}]}}</v>
+	<d>The issuer id consists of the serial number and the issuers name.</d>
+	<v>Reason = term()</v>
+  </type> 
+  <desc> 
+    <p> Returns the issuer id.</p> 
+  </desc> 
+  </func>
+
+  <func>
+    <name>pkix_normalize_name(Issuer) -> Normalized</name>
+    <fsummary>Normalizes a issuer name so that it can be easily
+    compared to another issuer name. </fsummary>
+    <type>
+      <v>Issuer = {rdnSequence,[#'AttributeTypeAndValue'{}]}</v>
+      <v>Normalized = {rdnSequence, [#'AttributeTypeAndValue'{}]}</v>
+  </type> 
+  <desc> 
+    <p>Normalizes a issuer name so that it can be easily
+    compared to another issuer name.</p> 
+  </desc> 
+  </func>
+   
+  <!-- <func> -->
+  <!--   <name>pkix_path_validation()</name> -->
+  <!--   <fsummary> Performs a basic path validation according to RFC 5280.</fsummary> -->
+  <!--   <type> -->
+  <!--     <v></v>  -->
+  <!--   </type>  -->
+  <!--   <desc>  -->
+  <!--     <p> Performs a basic path validation according to RFC 5280.</p>  -->
+  <!--   </desc>  -->
+  <!-- </func> -->
+
+  
+  <func>
+    <name>pkix_sign(#'OTPTBSCertificate'{}, Key) -> der_encode()</name>
+    <fsummary>Signs certificate.</fsummary>
+    <type>
+      <v>Key = rsa_public_key() | dsa_public_key()</v> 
+    </type> 
+    <desc> 
+      <p>Signs a 'OTPTBSCertificate'. Returns the corresponding
+      der encoded certificate.</p> 
+    </desc> 
+  </func> 
+
+  <func>  
+    <name>pkix_verify(Cert, Key) -> boolean()</name>
+    <fsummary> Verify pkix x.509 certificate signature.</fsummary>
+    <type>
+      <v>Cert = der_encode()</v> 
+      <v>Key = rsa_public_key() | dsa_public_key()</v> 
+    </type> 
+  <desc> 
+    <p> Verify pkix x.509 certificate signature.</p> 
+  </desc> 
+  </func> 
+
+  <func>
+    <name>sign(Msg, DigestType, Key) -> binary()</name>
+    <fsummary> Create digital signature.</fsummary>
+    <type>
+       <v>Msg = binary()</v>
+       <d>The msg is either the binary "plain text" data to be
+       signed or in the case that digest type is <c>none</c>
+       it is the hashed value of "plain text" i.e. the digest.</d>
+       <v>DigestType = rsa_digest_type() | dsa_digest_type()</v>
+       <v>Key = rsa_private_key() | dsa_private_key()</v>
+  </type> 
+  <desc> 
+    <p> Creates a digital signature.</p> 
+  </desc> 
+  </func>   
+
+  <func>
+    <name>ssh_decode(SshBin,  Type) -> [{public_key(), Attributes::list()}]</name>
+    <fsummary>Decodes a ssh file-binary. </fsummary>
+    <type>
+      <v>SshBin = binary()</v>
+      <d>Example {ok, SshBin} = file:read_file("known_hosts").</d>
+      <v> Type = public_key | ssh_file()</v>
+      <d>If <c>Type</c> is <c>public_key</c> the binary may be either
+      a rfc4716 public key or a openssh public key.</d>
+    </type>
+  <desc>
+    <p> Decodes a ssh file-binary. In the case of know_hosts or
+    auth_keys the binary may include one or more lines of the
+    file. Returns a list of public keys and their attributes, possible
+    attribute values depends on the file type represented by the
+    binary.
+    </p>
+
+    <taglist>
+      <tag>rfc4716 attributes - see RFC 4716</tag>
+      <item>{headers, [{string(), utf8_string()}]}</item>
+      <tag>auth_key attributes - see man sshd </tag>
+      <item>{comment, string()}</item>
+      <item>{options, [string()]}</item>
+      <item>{bits, integer()} - In ssh version 1 files</item>
+      <tag>known_host attributes - see man sshd</tag>
+      <item>{hostnames, [string()]}</item>
+      <item>{comment, string()}</item>
+      <item>{bits, integer()} - In ssh version 1 files</item>
+    </taglist>
+
+  </desc>
+  </func>
+
+  <func>
+    <name>ssh_encode([{Key, Attributes}], Type) -> binary()</name>
+    <fsummary> Encodes a list of ssh file entries to a binary.</fsummary>
+    <type>
+      <v>Key = public_key()</v>
+      <v>Attributes = list()</v>
+      <v>Type = ssh_file()</v>
+    </type>
+  <desc>
+    <p>Encodes a list of ssh file entries (public keys and attributes) to a binary. Possible
+    attributes depends on the file type, see <seealso
+    marker="ssh_decode"> ssh_decode/2 </seealso></p>
+  </desc>
+  </func>
+
+  <func>
+    <name>verify(Msg, DigestType, Signature, Key) -> boolean()</name>
+    <fsummary>Verifies a digital signature.</fsummary>
+    <type>
+      <v>Msg = binary()</v>
+       <d>The msg is either the binary "plain text" data 
+        or in the case that digest type is <c>none</c>
+	it is the hashed value of "plain text" i.e. the digest.</d>
+      <v>DigestType = rsa_digest_type() | dsa_digest_type()</v>
+      <v>Signature = binary()</v>
+      <v>Key = rsa_public_key() | dsa_public_key()</v> 
+  </type> 
+  <desc> 
+    <p>Verifies a digital signature</p> 
+  </desc> 
+  </func>
+  
+</funcs>
+
+</erlref>

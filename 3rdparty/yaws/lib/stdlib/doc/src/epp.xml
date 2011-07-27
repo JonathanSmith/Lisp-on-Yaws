@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="latin1" ?>
+<!DOCTYPE erlref SYSTEM "erlref.dtd">
+
+<erlref>
+  <header>
+    <copyright>
+      <year>1996</year><year>2011</year>
+      <holder>Ericsson AB. All Rights Reserved.</holder>
+    </copyright>
+    <legalnotice>
+      The contents of this file are subject to the Erlang Public License,
+      Version 1.1, (the "License"); you may not use this file except in
+      compliance with the License. You should have received a copy of the
+      Erlang Public License along with this software. If not, it can be
+      retrieved online at http://www.erlang.org/.
+
+      Software distributed under the License is distributed on an "AS IS"
+      basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+      the License for the specific language governing rights and limitations
+      under the License.
+
+    </legalnotice>
+
+    <title>epp</title>
+    <prepared>Kenneth Lundin</prepared>
+    <responsible>Kenneth Lundin</responsible>
+    <docno>1</docno>
+    <approved>Kenneth Lundin</approved>
+    <checked></checked>
+    <date>97-01-31</date>
+    <rev>B</rev>
+    <file>epp.sgml</file>
+  </header>
+  <module>epp</module>
+  <modulesummary>An Erlang Code Preprocessor</modulesummary>
+  <description>
+    <p>The Erlang code preprocessor includes functions which are used
+      by <c>compile</c> to preprocess macros and include files before
+      the actual parsing takes place.</p>
+  </description>
+  <datatypes>
+    <datatype>
+      <name name="macros"></name>
+    </datatype>
+    <datatype>
+      <name name="epp_handle"></name>
+      <desc><p>Handle to the epp server.</p></desc>
+    </datatype>
+  </datatypes>
+  <funcs>
+    <func>
+      <name name="open" arity="2"/>
+      <name name="open" arity="3"/>
+      <fsummary>Open a file for preprocessing</fsummary>
+      <desc>
+        <p>Opens a file for preprocessing.</p>
+      </desc>
+    </func>
+    <func>
+      <name name="close" arity="1"/>
+      <fsummary>Close the preprocessing of the file associated with <c>Epp</c></fsummary>
+      <desc>
+        <p>Closes the preprocessing of a file.</p>
+      </desc>
+    </func>
+    <func>
+      <name name="parse_erl_form" arity="1"/>
+      <fsummary>Return the next Erlang form from the opened Erlang source file</fsummary>
+      <desc>
+        <p>Returns the next Erlang form from the opened Erlang source file.
+          The tuple <c>{eof, <anno>Line</anno>}</c> is returned at end-of-file. The first
+          form corresponds to an implicit attribute <c>-file(File,1).</c>, where
+          <c>File</c> is the name of the file.</p>
+      </desc>
+    </func>
+    <func>
+      <name name="parse_file" arity="3"/>
+      <fsummary>Preprocess and parse an Erlang source file</fsummary>
+      <desc>
+        <p>Preprocesses and parses an Erlang source file.
+          Note that the tuple <c>{eof, <anno>Line</anno>}</c> returned at end-of-file is
+          included as a "form".</p>
+      </desc>
+    </func>
+    <func>
+      <name name="format_error" arity="1"/>
+      <fsummary>Format an error descriptor</fsummary>
+      <desc>
+        <p>Takes an <c><anno>ErrorDescriptor</anno></c> and returns
+          a string which
+          describes the error or warning. This function is usually
+          called implicitly when processing an <c>ErrorInfo</c>
+          structure (see below).</p>
+      </desc>
+    </func>
+  </funcs>
+
+  <section>
+    <title>Error Information</title>
+    <p>The <c>ErrorInfo</c> mentioned above is the standard
+      <c>ErrorInfo</c> structure which is returned from all IO
+      modules. It has the following format:
+      </p>
+    <code type="none">
+    {ErrorLine, Module, ErrorDescriptor}    </code>
+    <p>A string which describes the error is obtained with the following call:
+      </p>
+    <code type="none">
+    Module:format_error(ErrorDescriptor)    </code>
+  </section>
+
+  <section>
+    <title>See Also</title>
+    <p><seealso marker="erl_parse">erl_parse(3)</seealso></p>
+  </section>
+</erlref>
+
