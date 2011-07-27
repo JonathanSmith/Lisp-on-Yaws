@@ -1,3 +1,0 @@
-%% -*- erlang -*-
-{incl_mods,[gen_udp,inet6_udp,inet_res,inet_dns]}.
-

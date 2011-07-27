@@ -1,1 +1,0 @@
-OBSERVER_VSN = 0.9.9
