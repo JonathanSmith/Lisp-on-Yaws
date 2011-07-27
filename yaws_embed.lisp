@@ -37,7 +37,7 @@
 
 (defun write-module-string (module-name node-name &rest resources)
   (let ((header (format nil "(defmodule ~a (export (out 1)))" module-name))
-	(include (format nil "(include-file \"yaws_api.lfe\")" ))
+	(include (format nil "(include-file \"\\home\\jon\\Lisp-On-Yaws\\include\\yaws_api.lfe\")" ))
 	(gen-out (format nil "(gen_resources ~a (~{~s~^ ~}))" node-name resources)))
     (format nil "~a~%~a~%~a~%" header include gen-out)))
 
