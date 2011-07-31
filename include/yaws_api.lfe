@@ -132,7 +132,8 @@
   (receive ((tuple ref pid 'ping)
 	    (: erlang send pid 'pong)
 	    (receive-loop ref))
-	   ((tuple ref msg) msg)))
+	   ((tuple ref msg)
+	    msg)))
 
 (defun out (arg)
   (let* ((url (: yaws_api request_url arg))
@@ -148,4 +149,4 @@
 	(: io format '"~p ~p~n" (list method path))
 	(tuple 'status 404)))))
 
-;(gen_resources clojure@Jon-Laptop [add [N M]] [div [N M]] [mul [N M]] [sub [N M]])
+;(gen_resources lisp@jon-VirtualBox [add [N M]] [div [N M]] [mul [N M]] [sub [N M]])

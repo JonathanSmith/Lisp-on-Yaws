@@ -75,7 +75,8 @@ conf_loop(Docroot, SConfList, GConfList, Id) ->
 	    end,
 	    case AppMod of
 		{_, AppModId} -> AppModId;
-		{_, AppModId, _} -> AppModId
+		{_, AppModId, _} -> AppModId;
+		AppModId -> AppModId
 	    end,
 	    
 	    case lists:keyfind(AppModId,2,Current_Appmods) of
