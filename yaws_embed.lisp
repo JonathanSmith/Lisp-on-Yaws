@@ -64,28 +64,16 @@
 
 (defvar +update_appmod+ (cleric:make-atom "update_appmod"))
 
-(defun add-appmod (module-name)
+(defun add-appmod (appmod)
   (cleric:reg-send *pid* "conf_control" "yaws"
-		   (cleric:tuple +update_appmod+ (cleric:make-atom module-name))))
-
-(defun hello-world (control-message)
-  (let* ((msg (cleric:message control-message))
-	 (vector (cleric:elements msg)))
-    ;(format t "~a~%" vector)
-    (let ((type (elt vector 0))
-	  (dest (elt vector 1))
-	  (ref (elt vector 2))
-	  (query (elt vector 3)))
-      ;(format t "a: ~s~%" dest)
-      ;(format t "b: ~S~%" (cleric::node dest))
-      ;(format t "c: ~s~%" (cleric::find-connected-remote-node (cleric::node dest)))
-      (cleric:send dest (cleric:tuple ref (cleric:tuple :|html| "Hello World"))))))
+		   (cleric:tuple +update_appmod+ appmod)))
 
 (defvar *elements*)
 (defvar *type*)
 (defvar *dest*)
 (defvar *ref*)
 (defvar *query*)
+(defvar *reply-type*)
 
 (defun reply (value &optional (reply-type *reply-type*))
   (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type value))))
@@ -100,7 +88,9 @@
 	      (*ref* (elt *elements* 2))
 	      (*query* (elt *elements* 3))
 	      (*reply-type* ,default-reply-type)
-	      (,len (length *elements*))
+	      ,@(if args 
+		    `(,len (length *elements*))
+		    nil)
 	      ,@(let ((i 4))
 		     (mapcar #'(lambda (arg) 
 				 (prog1 `(,arg (when (> ,len ,i)  (map 'string #'code-char (elt *elements* ,i))))
@@ -109,25 +99,15 @@
 	  
 	   ,@body))))
 
-(defun add-math-appmod ()
-  (let ((hello-world-lfe (write-module-string "addition" (cleric:this-node) "(addition GET (A B))")))
-    (send-file-for-compilation "addition" hello-world-lfe))
-  (add-appmod "addition")
-  (register "addition"
-	    (easy-handler (a b) (:|html|)
-	      (block nil
-		(if (and a b) 
-		    (let ((a-int (handler-case (parse-integer a)
-				   (sb-int::simple-parse-error () 
-				     (reply "parse error on a")
-				     (return)))))		  
-		      (let ((b-int (handler-case (parse-integer b)
-				     (sb-int::simple-parse-error ()
-				       (reply "parse error on b")
-				       (return)))))
-			(reply (format nil "~s" (+ a-int b-int)))))
-		    (reply "not enough args"))))))
 
+(defun hello-world (control-message)
+  (let* ((msg (cleric:message control-message))
+	 (vector (cleric:elements msg)))
+    (let ((type (elt vector 0))
+	  (dest (elt vector 1))
+	  (ref (elt vector 2))
+	  (query (elt vector 3)))
+      (cleric:send dest (cleric:tuple ref (cleric:tuple :|html| "Hello World"))))))
 
 (defun init ()
   (let ((yaws-server (cleric-epmd:lookup-node "yaws" *yaws-server-node-name*)))
@@ -137,8 +117,55 @@
   (node-listener-thread #'hash-dispatch)
   (let ((hello-world-lfe (write-module-string "hello_world" (cleric:this-node) "(hello_world GET ())")))
     (send-file-for-compilation "hello_world" hello-world-lfe))
-  (add-appmod "hello_world")
-  (register "hello_world" #'hello-world))
+  (add-appmod (cleric:make-atom "hello_world"))
+  (register "hello_world" (easy-handler () (:|html|)
+			    (reply "hello world"))))
 
+(defun add-math-appmod ()
+  (let ((hello-world-lfe (write-module-string "basic_math" (cleric:this-node) 
+					      "(addition GET (\"+\" B C))"
+					      "(subtraction GET (\"-\" B C))"
+					      "(multiplication GET (\"*\" B C))"
+					      "(equals GET (\"=\" B C))")))
+    (send-file-for-compilation "basic_math" hello-world-lfe)
+    (add-appmod (cleric:tuple  "math" (cleric:make-atom "basic_math")))
+    (macrolet ((parse-or-reply (symbol &optional (emessage "error"))
+		 (assert (symbolp symbol))
+		 `(handler-case (parse-integer ,symbol)
+		    (sb-int::simple-parse-error () 
+		      (reply ,emessage)
+		      (return)))))
+      (register "addition"
+		(easy-handler (a b) (:|html|)
+		  (block nil
+		    (if (and a b) 
+			(let* ((a-int (parse-or-reply a "parse error on a"))		  
+			       (b-int (parse-or-reply b "parse error on b")))
+			  (reply (format nil "~s" (+ a-int b-int))))
+			(reply "not enough args")))))
+      (register "subtraction"
+		(easy-handler (a b) (:|html|)
+		  (block nil
+		    (if (and a b) 
+			(let* ((a-int (parse-or-reply a "parse error on a"))		  
+			       (b-int (parse-or-reply b "parse error on b")))
+			  (reply (format nil "~s" (- a-int b-int))))
+			(reply "not enough args")))))
+      (register "multiplication"
+		(easy-handler (a b) (:|html|)
+		  (block nil
+		    (if (and a b) 
+			(let* ((a-int (parse-or-reply a "parse error on a"))		  
+			       (b-int (parse-or-reply b "parse error on b")))
+			  (reply (format nil "~s" (* a-int b-int))))
+			(reply "not enough args")))))
+      (register "equals"
+		(easy-handler (a b) (:|html|)
+		  (block nil
+		    (if (and a b) 
+			(let* ((a-int (parse-or-reply a "parse error on a"))		  
+			       (b-int (parse-or-reply b "parse error on b")))
+			  (reply (if (= a-int b-int) "true" "false")))
+			(reply "not enough args"))))))))
 
 ;(cleric:reg-send *pid* "cleric_listener" "yaws" "Hello, Erlang world!")
