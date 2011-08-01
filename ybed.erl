@@ -44,7 +44,13 @@ lfe_comp_loop(Ebin,SrcDir) ->
     	    lfe_comp:file(FilePath,[{outdir,Ebin}]),
 	    ModuleAtom = list_to_atom(ModuleName),
 	    io:format("load: ~p ~n",[ModuleName]),
-      	    code:load_file(ModuleAtom),
+	    case code:is_loaded(ModuleAtom) of
+		{file, _Loaded} ->
+		    code:purge(ModuleAtom),
+		    code:load_file(ModuleAtom);
+		false ->
+		code:load_file(ModuleAtom)
+	    end,
 	    io:format("done: ~p ~n",[ModuleName]),
 	    lfe_comp_loop(Ebin,SrcDir)
     end.
