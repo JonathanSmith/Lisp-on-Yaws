@@ -1,0 +1,26 @@
+Copyright 2011 Jonathan Smith may be redistributed in whole or in part under a BSD or MIT license.
+
+Included projects (Yaws and LFE) are subject to their respective copyrights.
+
+To run:
+
+Configure/Make LFE and Yaws in '3rdparty' directories, using appropriate directives.
+
+Install CLERIC via quicklisp. 
+	Currently working with 2011-06-19, does not work with 2011/07/30 as of 2011/08/02.
+In main directory run:
+./erlcompile
+./yawstart
+in the resulting erlang terminal, run 
+ybed_sup:start_link().
+Go to the common lisp directory open
+'yaws_embed.lisp' and 'examples.lisp' in an emacs session.
+start slime
+(ql:quickload "CLERIC") in the resulting terminal.
+Edit the defparameters at the top of yaws_embed.lisp so that they match your computer's configuration.
+(Specifically the cookie path, and the yaws node computer name).
+compile and load yaws_embed and examples lisp files. (In that order).
+type (init) into the repl and press enter.
+type (add-math-appmod) into the repl and press enter.
+
+If everything went well, you should be able to visit http://0.0.0.0:8080/hello_world in a web browser and get 'hello world', you should be able to visiti http://0.0.0:8080/math/+/2/3/ and get '5'.
