@@ -23,4 +23,6 @@ compile and load yaws_embed and examples lisp files. (In that order).
 type (init) into the repl and press enter.
 type (add-math-appmod) into the repl and press enter.
 
-If everything went well, you should be able to visit http://0.0.0.0:8080/hello_world in a web browser and get 'hello world', you should be able to visiti http://0.0.0:8080/math/+/2/3/ and get '5'.
+If everything went well:
+ you should be able to visit http://0.0.0.0:8080/hello_world in a web browser and get 'hello world'
+ you should be able to visit http://0.0.0:8080/math/+/2/3/ and get '5'.
