@@ -1,0 +1,1 @@
+erlc -o $PWD/ebin $PWD/erlang/*.erl -pa $PWD/3rdparty/lfe/ebin $PWD/3rdparty/yaws/ebin
