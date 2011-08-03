@@ -34,8 +34,8 @@ run() ->
     {ok, self()}.
 
 write_static_page_loop(Docroot) ->
-    receive {Path,Filename,PageData} ->
-	    FilePath = Docroot ++ Path ++ "/" ++ Filename,
+    receive {Path,FileName,PageData} ->
+	    FilePath = Docroot ++ Path ++ "/" ++ FileName,
 	    case file:write_file(FilePath,PageData) of
 		ok -> ok;
 		{error,enoent} -> 
@@ -44,9 +44,12 @@ write_static_page_loop(Docroot) ->
 		{error,enotdir} ->
 		    file:make_dir(Docroot ++ Path ++ "/"),
 		    file:write_file(FilePath,PageData)
-	    end,
-	    write_static_page_loop(Docroot)
-    end.
+	    end;
+	    {FileName,PageData} ->
+	    FilePath = Docroot ++ FileName,
+	    file:write_file(FilePath,PageData)
+    end,
+    write_static_page_loop(Docroot).
 
 lfe_comp_loop(Ebin,SrcDir) ->
     receive {file,ModuleName, FileData} ->

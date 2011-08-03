@@ -32,7 +32,6 @@
 (defmethod hash-dispatch ((control-message cleric:reg-send))
   (let* ((to-name (cleric:to-name control-message))
 	 (fnlambda (gethash to-name *reg-pids-hash*)))
-    
     (when fnlambda (funcall fnlambda control-message))))
 
 (defmethod hash-dispatch ((control-message cleric:send))
@@ -46,14 +45,14 @@
     pid))
 
 (defun register (string fn)
-  (setf (gethash (intern string "KEYWORD") *reg-pids-hash* ) fn))
+  (setf (gethash (intern (string-upcase string) "KEYWORD") *reg-pids-hash* ) fn))
 
 (defvar +file-atom+ (cleric:make-atom "file"))
 
 (defun write-module-string (module-name node-name &rest resources)
   (let ((header (format nil "(defmodule ~a (export (out 1)))" module-name))
 	(include (format nil "(include-file \"include/yaws_api.lfe\")" ))
-	(gen-out (format nil "(gen_resources ~a (~{(~{~:a~^ ~})~}))" node-name resources)))
+	(gen-out (format nil "(gen_resources ~a (~{(~{~:s~^ ~})~}))" node-name resources)))
     (format nil "~a~%~a~%~a~%" header include gen-out)))
 
 (defun send-file-for-compilation (module-name file-data)
