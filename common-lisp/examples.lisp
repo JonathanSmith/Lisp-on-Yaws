@@ -1,3 +1,6 @@
+(setf *yaws-server-node-name* "jon-VirtualBox")
+(setf *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
+
 (defun init ()
   (let ((yaws-server (cleric-epmd:lookup-node "yaws" *yaws-server-node-name*)))
     (let ((cookie (with-open-file (stream *cookie-file* :direction :input)

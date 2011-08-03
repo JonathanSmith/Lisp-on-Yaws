@@ -1,5 +1,5 @@
-(defparameter *yaws-server-node-name* "jon-VirtualBox")
-(defparameter *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
+(defvar *yaws-server-node-name*)
+(defvar *cookie-file*)
 (defvar *yaws-listener-thread*)
 (defvar *pids-hash* (make-hash-table))
 (defvar *reg-pids-hash* (make-hash-table))
