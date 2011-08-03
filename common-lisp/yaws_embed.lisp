@@ -60,6 +60,9 @@
   (cleric:reg-send *pid* "lfe_compiler" "yaws" 
 		   (cleric:tuple +file-atom+  module-name file-data)))
 
+(defun send-static-page (path filename data)
+  (cleric:reg-send *pid* "write_page" "yaws" (cleric:tuple path filename data)))
+
 (defvar +update_appmod+ (cleric:make-atom "update_appmod"))
 
 (defun add-appmod (appmod)

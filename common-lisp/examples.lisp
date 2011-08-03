@@ -13,6 +13,9 @@
   (register "hello_world" (easy-handler () (:|html|)
 			    (reply "hello world"))))
 
+(defun add-foo-page ()
+  (send-static-page "bar" "foo.html" "<b>foo!</b>"))
+
 (defun add-math-appmod ()
   (let ((hello-world-lfe (write-module-string "basic_math" (cleric:this-node) 
 					      '(addition GET ("+" B C))

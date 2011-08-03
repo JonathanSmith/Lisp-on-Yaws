@@ -4,6 +4,17 @@
 start() ->
     {ok, spawn(?MODULE, run, [])}.
 
+spawn_and_register(RegId, Module, FunId, FunArgs) ->
+    Process = spawn(Module, FunId, FunArgs),
+    case register(RegId,Process) of
+	badarg ->
+	    unregister(RegId),
+	    register(RegId,Process),
+	    ok;
+	true ->
+	    ok
+    end.
+
 run() ->
     Id = "embedded",
     GConfList = [{id, Id}],
@@ -15,25 +26,27 @@ run() ->
                  {listen, {0,0,0,0}},
                  {docroot, Docroot}],
     {ok, SCList, GC, ChildSpecs} = yaws_api:embedded_start_conf(Docroot, SConfList, GConfList, Id),
-   [ supervisor:start_child(ybed_sup, Ch)  || Ch <- ChildSpecs ],
+    [supervisor:start_child(ybed_sup, Ch)  || Ch <- ChildSpecs],
     yaws_api:setconf(GC, SCList),
-    ConfControl = spawn(?MODULE, conf_loop, [Docroot, SConfList, GConfList, Id]),
-    case register(conf_control,ConfControl) of
-	badarg ->
-	    unregister(conf_control),
-	    register(conf_control,ConfControl);
-	true ->
-	    ok		
-    end,
-    CompControl = spawn(?MODULE, lfe_comp_loop, [Ebin,SrcDir]),
-    case register(lfe_compiler,CompControl) of
-	badarg ->
-	    unregister(lfe_compiler),
-	    register(lfe_compiler,CompControl);
-	true ->
-	    ok
-    end,
+    spawn_and_register(conf_control, ?MODULE, conf_loop, [Docroot, SConfList, GConfList, Id]),
+    spawn_and_register(lfe_compiler, ?MODULE, lfe_comp_loop, [Ebin,SrcDir]),
+    spawn_and_register(write_page, ?MODULE, write_static_page_loop, [Docroot ++ "/"]),
     {ok, self()}.
+
+write_static_page_loop(Docroot) ->
+    receive {Path,Filename,PageData} ->
+	    FilePath = Docroot ++ Path ++ "/" ++ Filename,
+	    case file:write_file(FilePath,PageData) of
+		ok -> ok;
+		{error,enoent} -> 
+		    file:make_dir(Docroot ++ Path ++ "/"),
+		    file:write_file(FilePath,PageData);
+		{error,enotdir} ->
+		    file:make_dir(Docroot ++ Path ++ "/"),
+		    file:write_file(FilePath,PageData)
+	    end,
+	    write_static_page_loop(Docroot)
+    end.
 
 lfe_comp_loop(Ebin,SrcDir) ->
     receive {file,ModuleName, FileData} ->
