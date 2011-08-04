@@ -44,6 +44,13 @@
     (setf (gethash pid *pids-hash*) fn)
     pid))
 
+(defun init-server-connection ()
+  (let ((yaws-server (cleric-epmd:lookup-node "yaws" *yaws-server-node-name*)))
+    (let ((cookie (with-open-file (stream *cookie-file* :direction :input)
+		    (read-line stream))))
+      (cleric:remote-node-connect yaws-server cookie)))
+  (node-listener-thread #'hash-dispatch))
+
 (defun register (string fn)
   (setf (gethash (intern (string-upcase string) "KEYWORD") *reg-pids-hash* ) fn))
 
@@ -99,5 +106,15 @@
 	  
 	   ,@body))))
 
+(defmacro static-page-generator (((path-var filename-var) &rest args) &body body)
+  (let ((page-result (gensym)))
+    `(lambda (,path-var ,filename-var ,@args)
+       (let ((,page-result (progn ,@body)))
+	 (send-static-page ,path-var ,filename-var ,page-result)))))
 
+(defvar *appmods*)
+
+(defstruct appmod 
+  (name)
+  (functions))
 

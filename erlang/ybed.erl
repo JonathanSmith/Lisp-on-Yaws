@@ -43,7 +43,10 @@ write_static_page_loop(Docroot) ->
 		    file:write_file(FilePath,PageData);
 		{error,enotdir} ->
 		    file:make_dir(Docroot ++ Path ++ "/"),
-		    file:write_file(FilePath,PageData)
+		    file:write_file(FilePath,PageData);
+		ELSE ->
+		    io:format("~w ~w ~n",[ELSE,FilePath])
+			
 	    end;
 	    {FileName,PageData} ->
 	    FilePath = Docroot ++ FileName,
