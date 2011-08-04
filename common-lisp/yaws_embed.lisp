@@ -103,7 +103,6 @@
 				 (prog1 `(,arg (when (> ,len ,i)  (map 'string #'code-char (elt *elements* ,i))))
 				   (incf i)))
 			     args)))
-	  
 	   ,@body))))
 
 (defmacro static-page-generator (((path-var filename-var) &rest args) &body body)
