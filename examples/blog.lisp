@@ -19,8 +19,7 @@
 				   (:h4 (cl-who:str author))
 				   (:h4 (cl-who:str date-string))
 				   :br
-				   (:a :href "/posts/index.html"
-				       (:b "back to index")))))))
+				   (:a :href "/posts/index.html" (:b "back to index")))))))
 	(send-static-page "posts" (format nil "~a.html" universal-time) page)))))
 
 (defun generate-post-from-file (post)
@@ -65,11 +64,8 @@
 				      (cl-who:htm (:h2 (:a :href (format nil "/posts/~a.html" time)
 							   (:b (cl-who:str title)))))))
 			      (:h4 (:a :href "/blog/" "New Post"))
-			      (:h4 (:a :href "/blog/register/" "Register"))
-			      )))))
+			      (:h4 (:a :href "/blog/register/" "Register")))))))
     (send-static-page "posts" "index.html" index-page)))
-
-
 
 (defparameter *salt* "PASSWORD")
 (defparameter *password-hash* (make-hash-table :test #'equalp))
@@ -147,17 +143,13 @@
       ((or (gethash author *password-hash*) (< (length author) 3))
        (reply (cl-who:with-html-output-to-string (var)
 		(:html (:body (:B "Name already taken or name must be at least 3 characters")
-			      :br
-			      (:b (:a :href "/blog/register"
-				      "Try Again")))))))
+			      :br (:b (:a :href "/blog/register" "Try Again")))))))
       ((string= password password2)
        (add-password author password)
        (reply "/blog" :|redirect|))
       (T (reply (cl-who:with-html-output-to-string (var)
 		  (:html (:body (:B "Passwords do not match")
-				:br
-				(:b (:a :href "/blog/register"
-					"Try Again"))))))))))
+				:br (:b (:a :href "/blog/register" "Try Again"))))))))))
 
 
 (defun blog-main ()
