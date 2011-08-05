@@ -111,9 +111,45 @@
        (let ((,page-result (progn ,@body)))
 	 (send-static-page ,path-var ,filename-var ,page-result)))))
 
-(defvar *appmods*)
+(defun parse-query (query)
+  (mapcar #'(lambda (tuple)
+	      (map 'list #'(lambda (x) (map 'string #'code-char x)) (cleric:elements tuple))) query))
 
-(defstruct appmod 
-  (name)
-  (functions))
+(defparameter *appmods* (make-hash-table :test #'equalp))
 
+(defun add-appmod-resource (name resource)
+  (let ((mod-description (gethash name *appmods* nil)))
+    (if mod-description
+	(let* ((component-resource (assoc resource mod-description :test #'equalp))
+	       (mod-description2 (if component-resource
+				     (remove component-resource mod-description :test #'equalp)
+				     mod-description)))
+	  (setf (gethash name *appmods*) (push resource mod-description2)))
+	(setf (gethash name *appmods*) (list resource)))))
+
+(defun appmod-path-name-gen (appmod type path)
+  (reduce (lambda (x y) (format nil "~a-~a" x y))
+	  (cons (string-upcase (if (stringp type) type (symbol-name type)))
+		(cons (string-upcase (if (stringp appmod) appmod (symbol-name appmod)))
+		      (mapcar (lambda (p) 
+				(string-upcase (cond ((stringp p) p)
+						     ((symbolp p) (symbol-name p)))))
+			      path)))))
+
+(defmacro defhandler ((mod type path) return-type &body body)
+  (let* ((appname (appmod-path-name-gen mod type path))
+	 (args (remove-if-not #'symbolp path))
+	 (module-resource (list (intern appname) (intern (symbol-name type)) path)))
+
+    `(progn
+       (add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) ',module-resource)
+       (register ,appname
+		 (easy-handler ,args ,return-type
+		   ,@body)))))
+  
+(defun generate-appmods ()
+  (maphash (lambda (mod resources)
+	     (let ((mod-string (apply #'write-module-string mod (cleric:this-node) resources)))
+	       (send-file-for-compilation mod mod-string)
+	       (add-appmod (cleric:tuple mod (cleric:make-atom mod)))))
+	   *appmods*))
