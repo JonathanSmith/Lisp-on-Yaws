@@ -1,7 +1,7 @@
 (defparameter *posts-directory* "~/posts/*.pst")
 (defvar *post-headers* nil)
-(setf *yaws-server-node-name* "jon-VirtualBox")
-(setf *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
+(setf *yaws-server-node-name* "jon-desktop")
+(setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
 ;;header -> (universal-time author title)
 
@@ -63,73 +63,109 @@
 				 do (destructuring-bind (time author title) header
 				      (declare (ignore author))
 				      (cl-who:htm (:h2 (:a :href (format nil "/posts/~a.html" time)
-							   (:b (cl-who:str title))))
-						  :br)))
-			      (:h4 (:a :href "/blog/"
-				       "New Post" ))
+							   (:b (cl-who:str title)))))))
+			      (:h4 (:a :href "/blog/" "New Post"))
+			      (:h4 (:a :href "/blog/register/" "Register"))
 			      )))))
     (send-static-page "posts" "index.html" index-page)))
 
-(defun blog-main ()
-  (setf *post-headers* nil)
-  (let ((posts (directory *posts-directory*)))
-    (dolist (post posts)
-      (generate-post-from-file post))
-    (setf *post-headers* (sort *post-headers* #'> :key #'first))
-    (generate-index)))
 
-(defun parse-query (query)
-  (mapcar #'(lambda (tuple)
-	      (map 'list #'(lambda (x) (map 'string #'code-char x)) (cleric:elements tuple))) query))
 
 (defparameter *salt* "PASSWORD")
 (defparameter *password-hash* (make-hash-table :test #'equalp))
 
 (defun obfuscate-password (password)
-  (let* ((salted (concatenate 'string *salt* password))
-	 (map 'string #'code-char (md5::MD5SUM-SEQUENCE salted)))))
+  (let* ((salted (concatenate 'string *salt* password)))
+    (map 'string #'code-char (md5::MD5SUM-SEQUENCE salted))))
 
 (defun add-password (name password)
   (setf (gethash name *password-hash*) (obfuscate-password password)))
 
 (defun check-password (name password)
-  (equalp (gethash name *password-hash*) (obfuscate-pasword password)))
+  (string= (gethash name *password-hash*) (obfuscate-password password)))
 
-(defun add-blog-appmod ()
-  (let ((hello-blog-lfe (write-module-string "blog" (cleric:this-node)
-					     '(main GET ())
-					     '(main POST ()))))
-    (send-file-for-compilation "blog" hello-blog-lfe)
-    (add-appmod (cleric:tuple "blog" (cleric:make-atom "blog")))
-    (register "main"
-	      (easy-handler () (:|html|)
-		(if (eql *type* :POST)
-		    (let* ((q (parse-query *query*))
-			   (author (second (assoc "author" q :test #'string=)))
-			   (password (second (assoc "password" q :test #'string=)))
-			   (title (second (assoc "title" q :test #'string=)))
-			   (post (second (assoc "post" q :test #'string=))))
-		      (when (and (and author password title post) (check-password author password))
-			(let ((pst-file (generate-post-pst-file title author post)))
-			  (generate-post-from-file pst-file)
-			  (generate-index))
-			(reply "/posts/index.html" :|redirect|)))
-		(reply (cl-who:with-html-output-to-string (var)
-			 (:html (:title "A Blog") 
-				(:body  (:B "Not Much Here")
-					(:form :action "/blog" :method "POST"
-					       "Author"
-					       :br
-					       (:input :type "text" :name "author")
-					       :br
-					       "Password"
-					       :br
-					       (:input :type "password" :name "password")
-					       :br
-					       "Title"
-					       (:input :type "text" :name "title")
-					       :br
-					       "Text"
-					       (:textarea :row "6" :cols "80" :name "post")
-					       :br
-					       (:input :type "submit" :value "Submit")))))))))))
+(defhandler (blog get ()) (:|html|)
+  (reply (cl-who:with-html-output-to-string (var)
+	   (:html (:title "A Blog") 
+		  (:body  (:B "Not Much Here")
+			  (:form :action "/blog" :method "POST"
+				 "Author"
+				 :br
+				 (:input :type "text" :name "author")
+				 :br
+				 "Password"
+				 :br
+				 (:input :type "password" :name "password")
+				 :br
+				 "Title"
+				 (:input :type "text" :name "title")
+				 :br
+				 "Text"
+				 :br
+				 (:textarea :row "6" :cols "60" :name "post")
+				 :br
+				 (:input :type "submit" :value "Submit")))))))
+
+(defhandler (blog post ()) (:|html|)
+  (let* ((q (parse-query *query*))
+	 (author (second (assoc "author" q :test #'string=)))
+	 (password (second (assoc "password" q :test #'string=)))
+	 (title (second (assoc "title" q :test #'string=)))
+	 (post (second (assoc "post" q :test #'string=))))
+    (if (and (and author password title post) (check-password author password))
+	(let ((pst-file (generate-post-pst-file title author post)))
+	  (generate-post-from-file pst-file)
+	  (generate-index)
+	  (reply "/posts/index.html" :|redirect|))
+	(reply "/index.html" :|redirect|))))
+
+(defhandler (blog get ("register")) (:|html|)
+  (reply (cl-who:with-html-output-to-string (var)
+	   (:html (:title "Registration")
+		  (:body (:B "Register to Post")
+			 (:form :action "/blog/register" :method "POST"
+				"Author"
+				:br
+				(:input :type "text" :name "author")
+				:br
+				"Password"
+				:br
+				(:input :type "password" :name "password")
+				:br
+				"Password Again"
+				:br
+				(:input :type "password" :name "password2")
+				:br
+				(:input :type "submit" :value "Submit")))))))
+
+(defhandler (blog post ("register")) (:|html|)
+  (let*  ((q (parse-query *query*))
+	  (author (second (assoc "author" q :test #'string=)))
+	  (password (second (assoc "password" q :test #'string=)))
+	  (password2 (second (assoc "password2" q :test #'string=))))
+    (cond 
+      ((or (gethash author *password-hash*) (< (length author) 3))
+       (reply (cl-who:with-html-output-to-string (var)
+		(:html (:body (:B "Name already taken or name must be at least 3 characters")
+			      :br
+			      (:b (:a :href "/blog/register"
+				      "Try Again")))))))
+      ((string= password password2)
+       (add-password author password)
+       (reply "/blog" :|redirect|))
+      (T (reply (cl-who:with-html-output-to-string (var)
+		  (:html (:body (:B "Passwords do not match")
+				:br
+				(:b (:a :href "/blog/register"
+					"Try Again"))))))))))
+
+
+(defun blog-main ()
+  (init-server-connection)
+  (setf *post-headers* nil)
+  (let ((posts (directory *posts-directory*)))
+    (dolist (post posts)
+      (generate-post-from-file post))
+    (setf *post-headers* (sort *post-headers* #'> :key #'first))
+    (generate-index))
+  (generate-appmods))
