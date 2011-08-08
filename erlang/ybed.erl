@@ -24,7 +24,8 @@ run() ->
     SConfList = [{port, 8080},
                  {servername, "foobar"},
                  {listen, {0,0,0,0}},
-                 {docroot, Docroot}],
+                 {docroot, Docroot},
+		{partial_post_size, nolimit}],
     {ok, SCList, GC, ChildSpecs} = yaws_api:embedded_start_conf(Docroot, SConfList, GConfList, Id),
     [supervisor:start_child(ybed_sup, Ch)  || Ch <- ChildSpecs],
     yaws_api:setconf(GC, SCList),
@@ -56,21 +57,23 @@ write_static_page_loop(Docroot) ->
 
 lfe_comp_loop(Ebin,SrcDir) ->
     receive {file,ModuleName, FileData} ->
-	    io:format("write: ~p ~n",[ModuleName]),
-	    FilePath = SrcDir ++ ModuleName,
-    	    ok = file:write_file(FilePath ++ ".lfe", FileData),
-	    io:format("comp: ~p ~n",[ModuleName]),
-    	    lfe_comp:file(FilePath,[{outdir,Ebin}]),
-	    ModuleAtom = list_to_atom(ModuleName),
-	    io:format("load: ~p ~n",[ModuleName]),
-	    case code:is_loaded(ModuleAtom) of
-		{file, _Loaded} ->
-		    code:purge(ModuleAtom),
-		    code:load_file(ModuleAtom);
-		false ->
-		code:load_file(ModuleAtom)
-	    end,
-	    io:format("done: ~p ~n",[ModuleName]),
+	 spawn (fun () ->
+		    io:format("write: ~p ~n",[ModuleName]),
+		    FilePath = SrcDir ++ ModuleName,
+		    ok = file:write_file(FilePath ++ ".lfe", FileData),
+		    io:format("comp: ~p ~n",[ModuleName]),
+		    lfe_comp:file(FilePath,[{outdir,Ebin},report]),
+		    ModuleAtom = list_to_atom(ModuleName),
+		    io:format("load: ~p ~n",[ModuleName]),
+		    case code:is_loaded(ModuleAtom) of
+			{file, _Loaded} ->
+			    code:purge(ModuleAtom),
+			    code:load_file(ModuleAtom);
+			false ->
+			    code:load_file(ModuleAtom)
+		    end,
+		    io:format("done: ~p ~n",[ModuleName])
+	    end),
 	    lfe_comp_loop(Ebin,SrcDir)
     end.
 
@@ -103,7 +106,7 @@ conf_loop(Docroot, SConfList, GConfList, Id) ->
 		{_, AppModId, _} -> AppModId;
 		AppModId -> AppModId
 	    end,
-	    
+
 	    case lists:keyfind(AppModId,2,Current_Appmods) of
 		false ->
 		    New_Appmod_Tuple = {appmods, [AppMod | Current_Appmods]};
@@ -127,7 +130,7 @@ conf_loop(Docroot, SConfList, GConfList, Id) ->
 
 	{delete_appmod, AppModId} ->
 	    case lists:keyfind(appmods,1,SConfList) of
-	    {appmods, Current_Appmods} ->
+		{appmods, Current_Appmods} ->
 		    case lists:keyfind(AppModId,2,Current_Appmods) of
 			false ->
 			    conf_loop(Docroot, SConfList, GConfList, Id);
@@ -139,12 +142,12 @@ conf_loop(Docroot, SConfList, GConfList, Id) ->
 			    yaws_api:setconf(GC, SCList),
 			    conf_loop(Docroot, NewSC, GConfList, Id)
 		    end;
-	    false ->
+		false ->
 		    conf_loop(Docroot, SConfList, GConfList, Id)
 	    end;
 	{ping, PID} ->
 	    PID ! {pong,self()},
-	     conf_loop(Docroot, SConfList, GConfList, Id);
+	    conf_loop(Docroot, SConfList, GConfList, Id);
 	ANYTHING ->
 	    io:format("wrong command: ~p ~n",[ANYTHING]),
 	    conf_loop(Docroot, SConfList, GConfList, Id)

@@ -12,14 +12,12 @@
       (let* ((body-string (if (listp body) (eval body) body))
 	     (date-string (format nil "At ~a/~2,'0d/~2,'0d ~2,'0d:~2,'0d" year month date hour minute))
 	     (page (cl-who:with-html-output-to-string (var)
-		     (:html (:head (:title (cl-who:str title)))
-			    (:body (:h1 (cl-who:str title))
-				   
-				   (:p (cl-who:str body-string))
-				   (:h4 (cl-who:str author))
-				   (:h4 (cl-who:str date-string))
-				   :br
-				   (:a :href "/posts/index.html" (:b "back to index")))))))
+		     (:h1 (cl-who:str title))
+		     (:p (cl-who:str body-string))
+		     (:h4 (cl-who:str author))
+		     (:h4 (cl-who:str date-string))
+		     :br
+		     (:a :href "/posts/index.html" (:b "back to index")))))
 	(send-static-page "posts" (format nil "~a.html" universal-time) page)))))
 
 (defun generate-post-from-file (post)
@@ -55,16 +53,11 @@
 
 (defun generate-index ()
   (let ((index-page (cl-who:with-html-output-to-string (var)
-		      (:html (:head (:title "Index"))
-			     (:body 
-			      (:h1 "Jon Smith Weblog")
-			      (loop for header in *post-headers*
-				 do (destructuring-bind (time author title) header
-				      (declare (ignore author))
-				      (cl-who:htm (:h2 (:a :href (format nil "/posts/~a.html" time)
-							   (:b (cl-who:str title)))))))
-			      (:h4 (:a :href "/blog/" "New Post"))
-			      (:h4 (:a :href "/blog/register/" "Register")))))))
+		      (loop for header in *post-headers*
+			 do (destructuring-bind (time author title) header
+			      (declare (ignore author))
+			      (cl-who:htm (:h2 (:a :href (format nil "/posts/~a.html" time)
+						   (:b (cl-who:str title))))))))))
     (send-static-page "posts" "index.html" index-page)))
 
 (defparameter *salt* "PASSWORD")
@@ -80,11 +73,37 @@
 (defun check-password (name password)
   (string= (gethash name *password-hash*) (obfuscate-password password)))
 
+(defhandler (blog get ("ymacs"))(:|html|)
+  (reply (cl-who:with-html-output-to-string (var)
+	   (:html (:head (:title "Ymacs")
+			 (:link :rel "stylesheet" :type "text/css" :href "/dl/css/default.css")
+			 (:link :rel "stylesheet" :type "text/css" :href "/test.css")
+			 (:link :rel "stylesheet" :type "text/css" :href "/ymacs/css/ymacs.css"))
+		  (:body 
+		   (:center :style "margin-top: 10em" :id "x-loading"(:h1 (:tt "Loading")))
+		   (:script "window.Dynarc_base_Url = \"/dl\"; window.YMACS_SRC_PATH = \"/ymacs/js/\"")
+		   (:script :src "/dl/js/thelib.js")
+		   (:script :src "/ymacs/js/ymacs.js")
+		   (:div :style "display: none"
+			 (:div :id "browse-warning" :style "padding: 1em; width 20em;"
+			       (:b "ymacs disclaimer blah")))
+		   (:script :src "/test2.js")
+		   )))))
+
+
+
 (defhandler (blog get ()) (:|html|)
+  (reply (cl-who:with-html-output-to-string (var)
+	   (:html (:title "Title")
+		  (:script :type "application/javascript"
+			   :src "/blog/javascript")
+		  (:body (:B (:a :href "#" :onClick (ps:ps (my-callback)) "Click Here!")))))))
+
+(defhandler (blog get ("post")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
 	   (:html (:title "A Blog") 
 		  (:body  (:B "Not Much Here")
-			  (:form :action "/blog" :method "POST"
+			  (:form :action "/blog/post" :method "POST"
 				 "Author"
 				 :br
 				 (:input :type "text" :name "author")
@@ -102,7 +121,7 @@
 				 :br
 				 (:input :type "submit" :value "Submit")))))))
 
-(defhandler (blog post ()) (:|html|)
+(defhandler (blog post ("post")) (:|html|)
   (let* ((q (parse-query *query*))
 	 (author (second (assoc "author" q :test #'string=)))
 	 (password (second (assoc "password" q :test #'string=)))
@@ -151,6 +170,23 @@
 		  (:html (:body (:B "Passwords do not match")
 				:br (:b (:a :href "/blog/register" "Try Again"))))))))))
 
+(defhandler (blog post ("print")) (:|html|)
+  (reply "")
+  (format t "~s~%" *query*))
+
+(defhandler (blog get ("file")) (:|html|)
+  (reply (cl-who:with-html-output-to-string (var)
+	   (:html (:body (:form :action "/blog/file"
+				:enctype "multipart/form-data"
+				:method "post"
+				(:p "What is your name?" (:input :type "text" :name "name_of_sender")
+				    "What files are you sending?" (:input :type "file" :name "name_of_files"))
+				(:input :type "submit" :value "Submit")))))))
+
+(defhandler (blog post-multipart ("file")) (:|html|)
+  (reply "done!")
+  (format t "~s~%" *query*)
+  (format t "~s~%" (parse-multipart-query *query*))) 
 
 (defun blog-main ()
   (init-server-connection)

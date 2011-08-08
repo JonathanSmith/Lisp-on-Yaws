@@ -32,6 +32,7 @@
 (defmethod hash-dispatch ((control-message cleric:reg-send))
   (let* ((to-name (cleric:to-name control-message))
 	 (fnlambda (gethash to-name *reg-pids-hash*)))
+    (format t "~s~%" to-name)
     (when fnlambda (funcall fnlambda control-message))))
 
 (defmethod hash-dispatch ((control-message cleric:send))
@@ -81,11 +82,15 @@
 (defvar *ref*)
 (defvar *query*)
 (defvar *reply-type*)
+(defvar *content-type*)
 
-(defun reply (value &optional (reply-type *reply-type*))
-  (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type value))))
+(defun reply (value &optional (reply-type *reply-type*) (mime-type *content-type*))
+  (if (eql reply-type :|content|)
+      (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type mime-type value)))
+      (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type value)))))
 
-(defmacro easy-handler ((&rest args)(default-reply-type) &body body)
+(defmacro easy-handler ((&rest args) (&optional (default-reply-type :|html|)
+						(default-content-type nil)) &body body)
   (let ((control-message (gensym "control-message"))
 	(len (gensym "len")))
     `(lambda (,control-message)
@@ -95,6 +100,7 @@
 	      (*ref* (elt *elements* 2))
 	      (*query* (elt *elements* 3))
 	      (*reply-type* ,default-reply-type)
+	      (*content-type* ,default-content-type)
 	      ,@(if args 
 		    `((,len (length *elements*)))
 		    nil)
@@ -112,8 +118,26 @@
 	 (send-static-page ,path-var ,filename-var ,page-result)))))
 
 (defun parse-query (query)
-  (mapcar #'(lambda (tuple)
-	      (map 'list #'(lambda (x) (map 'string #'code-char x)) (cleric:elements tuple))) query))
+  (mapcar (lambda (tuple)
+	      (map 'list (lambda (x) (if (listp x) (map 'string #'code-char x) ""))
+		   (cleric:elements tuple)))
+	  query))
+
+(defun parse-multipart-query (query)
+  (mapcar (lambda (tuple) 
+	    (let* ((elements (cleric:elements tuple))
+		   (first-element (elt elements 0))
+		   (second-element (elt elements 1))
+		   (first-element-string (map 'string #'code-char first-element)))
+	      (if (listp second-element)
+		  (list first-element-string
+			(map 'string #'code-char second-element))
+		  (let* ((elements (cleric:elements second-element))
+			 (element-a (elt elements 0))
+			 (element-b (elt elements 1)))
+		    (list first-element-string 
+			  (map 'string #'code-char element-a) 
+			  (cleric::bytes element-b)))))) query))
 
 (defparameter *appmods* (make-hash-table :test #'equalp))
 
@@ -144,8 +168,7 @@
     `(progn
        (add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) ',module-resource)
        (register ,appname
-		 (easy-handler ,args ,return-type
-		   ,@body)))))
+		 (easy-handler ,args ,return-type ,@body)))))
   
 (defun generate-appmods ()
   (maphash (lambda (mod resources)
