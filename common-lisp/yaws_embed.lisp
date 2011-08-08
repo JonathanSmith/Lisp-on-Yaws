@@ -4,6 +4,7 @@
 (defvar *pids-hash* (make-hash-table))
 (defvar *reg-pids-hash* (make-hash-table))
 (defvar *pid* (cleric:make-pid))
+(defvar *thread-pool* (thread-pool:make-thread-pool 6))
 
 (defun cleric::find-connected-remote-node (node-name)
   (flet ((node-name= (node-name1 node-name2)
@@ -22,7 +23,7 @@
 
 (defun node-listener-thread (dispatch-function)
   (setf *yaws-listener-thread*
-	(sb-thread:make-thread 
+	(bordeaux-threads:make-thread 
 	 (lambda ()
 	   (do ()
 	       (NIL)
@@ -32,13 +33,19 @@
 (defmethod hash-dispatch ((control-message cleric:reg-send))
   (let* ((to-name (cleric:to-name control-message))
 	 (fnlambda (gethash to-name *reg-pids-hash*)))
-    (format t "~s~%" to-name)
-    (when fnlambda (funcall fnlambda control-message))))
+    (when fnlambda 
+      (thread-pool:add-to-pool 
+       *thread-pool*
+       (lambda ()
+	 (funcall fnlambda control-message))))))
 
 (defmethod hash-dispatch ((control-message cleric:send))
   (let* ((to-pid (cleric:to-pid control-message))
 	 (fnlambda (gethash to-pid *pids-hash*)))
-    (when fnlambda (funcall fnlambda control-message))))
+    (when fnlambda 
+      (thread-pool:add-to-pool
+       *thread-pool*
+       (funcall fnlambda control-message)))))
 
 (defun set-hash-dispatch (fn)
   (let ((pid (cleric:make-pid)))
@@ -50,6 +57,7 @@
     (let ((cookie (with-open-file (stream *cookie-file* :direction :input)
 		    (read-line stream))))
       (cleric:remote-node-connect yaws-server cookie)))
+  (thread-pool:start-pool *thread-pool*)
   (node-listener-thread #'hash-dispatch))
 
 (defun register (string fn)
@@ -129,6 +137,7 @@
 		   (first-element (elt elements 0))
 		   (second-element (elt elements 1))
 		   (first-element-string (map 'string #'code-char first-element)))
+	      
 	      (if (listp second-element)
 		  (list first-element-string
 			(map 'string #'code-char second-element))

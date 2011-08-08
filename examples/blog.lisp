@@ -186,7 +186,7 @@
 (defhandler (blog post-multipart ("file")) (:|html|)
   (reply "done!")
   (format t "~s~%" *query*)
-  (format t "~s~%" (parse-multipart-query *query*))) 
+  (format t "~s~%" (parse-multipart-query *query*)))
 
 (defun blog-main ()
   (init-server-connection)
