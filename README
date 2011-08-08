@@ -1,6 +1,6 @@
 Copyright 2011 Jonathan Smith may be redistributed in whole or in part under a BSD or MIT license.
 
-Included projects (Yaws and LFE) are subject to their respective copyrights.
+Included projects (Yaws, LFE, Ymacs and DynarchLIB) are subject to their respective copyrights.
 
 To run:
 
@@ -15,7 +15,9 @@ In main directory run:
 in the resulting erlang terminal, run 
 ybed_sup:start_link().
 
-Go to the common lisp directory open 'yaws_embed.lisp' and 'examples.lisp' in an emacs session.
+Go to the common lisp directory and open 'yaws_embed.lisp'.
+
+Go to the examples directory and open 'examples.lisp' in an emacs session.
 
 start slime
 
@@ -25,9 +27,7 @@ Edit the setfs at the top of examples.lisp so that they match your computer's co
 (Specifically the cookie path, and the yaws node computer name).
 
 Compile and load yaws_embed and examples lisp files. (In that order).
-
 Type (init) into the repl and press enter.
-
 Type (add-math-appmod) into the repl and press enter.
 
 If everything went well:
@@ -35,3 +35,8 @@ If everything went well:
  you should be able to visit http://0.0.0:8080/math/+/2/3/ and get '5'.
 
 If everything did not go well... let me know!
+
+yaws: http://yaws.hyber.org/
+lisp flavored erlang: https://github.com/rvirding/lfe
+ymacs: http://www.ymacs.org/
+DynarchLib http://www.dynarchlib.com/
