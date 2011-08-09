@@ -2,3 +2,4 @@
 (ql:quickload "CL-WHO")
 (ql:quickload "parenscript")
 (ql:quickload "thread-pool")
+(ql:quickload "cl-ppcre")
