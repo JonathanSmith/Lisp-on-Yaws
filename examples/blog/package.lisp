@@ -3,3 +3,4 @@
 (ql:quickload "parenscript")
 (ql:quickload "thread-pool")
 (ql:quickload "cl-ppcre")
+(ql:quickload "cl-markdown")

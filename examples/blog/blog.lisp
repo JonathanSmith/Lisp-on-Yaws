@@ -1,7 +1,7 @@
 (defparameter *posts-directory* (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 (defvar *post-headers* nil)
-(setf *yaws-server-node-name* "jon-desktop")
-(setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
+(setf *yaws-server-node-name* "jon-VirtualBox")
+(setf *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
 
 (defun generate-post-html (universal-time author title body)
   (multiple-value-bind (second minute hour date month year)  (decode-universal-time universal-time)
@@ -43,7 +43,7 @@
 			      :if-exists :supersede 
 			      :if-does-not-exist :create)
 	(write-header stream title author time)
-	(format stream "~a" lines))
+	(cl-markdown:markdown lines :stream stream))
       post-path)))
 
 (defun generate-index ()
@@ -65,18 +65,19 @@
 					(ps:chain ($ "div#blog") 
 						  (html data)))) #\")
 			     (:b (cl-who:str title)))))))))
-	   (destructuring-bind (time author title) (first *post-headers*)
-	     (declare (ignore author title))
-	     (let ((link (format nil "/posts/~a.html" time)))
-	       (cl-who:htm 
-		(:script 
-		 (cl-who:str 
-		  (ps:ps-inline*
-		   `($.get ,link 
-			   (ps:create)
-			   (lambda (data)
-			     (ps:chain ($ "div#blog") 
-				       (html data)))) #\")))))))))
+	   (when (first *post-headers*)
+	     (destructuring-bind (time author title) (first *post-headers*)
+	       (declare (ignore author title))
+	       (let ((link (format nil "/posts/~a.html" time)))
+		 (cl-who:htm 
+		  (:script 
+		   (cl-who:str 
+		    (ps:ps-inline*
+		     `($.get ,link 
+			     (ps:create)
+			     (lambda (data)
+			       (ps:chain ($ "div#blog") 
+					 (html data)))) #\"))))))))))
     
     (send-static-page "posts" "index.html" index-page)))
 
@@ -165,10 +166,10 @@
 	(let ((pst-file (generate-post-pst-file title author post)))
 	  (generate-post-from-file pst-file)
 	  (generate-index)
-	  (reply "/posts/index.html" :|redirect|))
-	(reply "/posts/index.html" :|redirect|))))
+	  (reply "/blog/" :|redirect|))
+	(reply "/blog/" :|redirect|))))
 
-#|(defhandler (blog get ("register")) (:|html|)
+(defhandler (blog get ("register")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
 	   (:html (:title "Registration")
 		  (:body (:B "Register to Post Comments")
@@ -185,13 +186,21 @@
 				:br
 				(:input :type "password" :name "password2")
 				:br
-				(:input :type "submit" :value "Submit")))))))|#
+				"Authorization Code"
+				:br
+				(:input :type "text" :name "auth")
+				:br
+				(:input :type "submit" :value "Submit")))))))
 
-#|(defhandler (blog post ("register")) (:|html|)
+(defvar *auth-code* "lisp rocks")
+
+(defhandler (blog post ("register")) (:|html|)
   (let*  ((q (parse-query *query*))
+	  (auth-code (second (assoc "auth" q :test #'string=)))
 	  (author (second (assoc "author" q :test #'string=)))
 	  (password (second (assoc "password" q :test #'string=)))
-	  (password2 (second (assoc "password2" q :test #'string=))))
+	  (password2 (second (assoc "password2" q :test #'string=)))
+	  (auth-code-valid (and auth-code (string= auth-code *auth-code*))))
     (cond 
       ((or (gethash author *password-hash*) (< (length author) 3))
        (reply (cl-who:with-html-output-to-string (var)
@@ -202,7 +211,7 @@
        (reply "/blog" :|redirect|))
       (T (reply (cl-who:with-html-output-to-string (var)
 		  (:html (:body (:B "Passwords do not match")
-				:br (:b (:a :href "/blog/register" "Try Again"))))))))))|#
+				:br (:b (:a :href "/blog/register" "Try Again"))))))))))
 
 (defhandler (blog get ("file")) (:|html|)
   (reply 
