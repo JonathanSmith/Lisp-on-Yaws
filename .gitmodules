@@ -12,9 +12,9 @@ url = https://github.com/klacke/yaws.git
 
 [submodule "ymacs"]
 
-path = www/ymacs
+	path = ymacs
 
-url = https://github.com/mishoo/ymacs.git
+	url = https://github.com/mishoo/ymacs.git
 [submodule "lfe"]
 	path = lfe
 	url = https://github.com/rvirding/lfe.git
