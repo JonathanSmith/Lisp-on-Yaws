@@ -123,7 +123,7 @@
   (let ((page-result (gensym)))
     `(lambda (,path-var ,filename-var ,@args)
        (let ((,page-result (progn ,@body)))
-	 (send-static-page ,path-var ,filename-var ,page-result)))))
+	 (cleric:send-static-page ,path-var ,filename-var ,page-result)))))
 
 (defun parse-query (query)
   (mapcar (lambda (tuple)
@@ -175,8 +175,8 @@
 	 (module-resource (list (intern appname) (intern (symbol-name type)) path)))
 
     `(progn
-       (add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) ',module-resource)
-       (register ,appname
+       (cleric:add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) ',module-resource)
+       (cleric:register ,appname
 		 (easy-handler ,args ,return-type ,@body)))))
   
 (defun generate-appmods ()
