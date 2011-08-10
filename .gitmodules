@@ -1,19 +1,5 @@
-[submodule "3rdparty/lfe"]
-
-path = 3rdparty/lfe
-
-url = https://github.com/rvirding/lfe.git
-
-[submodule "3rdparty/yaws"]
-
-path = 3rdparty/yaws
-
-url = https://github.com/klacke/yaws.git
-
 [submodule "ymacs"]
-
 	path = ymacs
-
 	url = https://github.com/mishoo/ymacs.git
 [submodule "lfe"]
 	path = lfe
