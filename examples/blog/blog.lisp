@@ -1,8 +1,7 @@
-(defparameter *posts-directory* "~/posts/*.pst")
+(defparameter *posts-directory* (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 (defvar *post-headers* nil)
 (setf *yaws-server-node-name* "jon-desktop")
 (setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
-
 
 (defun generate-post-html (universal-time author title body)
   (multiple-value-bind (second minute hour date month year)  (decode-universal-time universal-time)
@@ -116,7 +115,7 @@
      (:html (:head (:title "Jon's Blog")
 		   (:link :rel "stylesheet" :href "/blog.css"))
 	    (:body 
-	     (:h1 "Jon's Web Log")
+	     (:h1 "Jon's Blog")
 	     (:div :id "index")
 	     (:div :id "blog")
 	     (:script :src "/jquery.min.js")
@@ -169,10 +168,10 @@
 	  (reply "/posts/index.html" :|redirect|))
 	(reply "/posts/index.html" :|redirect|))))
 
-(defhandler (blog get ("register")) (:|html|)
+#|(defhandler (blog get ("register")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
 	   (:html (:title "Registration")
-		  (:body (:B "Register to Post")
+		  (:body (:B "Register to Post Comments")
 			 (:form :action "/blog/register" :method "POST"
 				"Author"
 				:br
@@ -186,9 +185,9 @@
 				:br
 				(:input :type "password" :name "password2")
 				:br
-				(:input :type "submit" :value "Submit")))))))
+				(:input :type "submit" :value "Submit")))))))|#
 
-(defhandler (blog post ("register")) (:|html|)
+#|(defhandler (blog post ("register")) (:|html|)
   (let*  ((q (parse-query *query*))
 	  (author (second (assoc "author" q :test #'string=)))
 	  (password (second (assoc "password" q :test #'string=)))
@@ -203,11 +202,7 @@
        (reply "/blog" :|redirect|))
       (T (reply (cl-who:with-html-output-to-string (var)
 		  (:html (:body (:B "Passwords do not match")
-				:br (:b (:a :href "/blog/register" "Try Again"))))))))))
-
-(defhandler (blog post ("print")) (:|html|)
-  (reply "")
-  (format t "~s~%" *query*))
+				:br (:b (:a :href "/blog/register" "Try Again"))))))))))|#
 
 (defhandler (blog get ("file")) (:|html|)
   (reply 
