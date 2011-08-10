@@ -1,6 +1,6 @@
 [submodule "ymacs"]
 	path = ymacs
-	url = https://github.com/mishoo/ymacs.git
+	url = git@github.com:JonathanSmith/ymacs.git
 [submodule "lfe"]
 	path = lfe
 	url = https://github.com/rvirding/lfe.git
