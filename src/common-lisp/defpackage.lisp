@@ -1,7 +1,7 @@
 (ql:quickload "thread-pool")
 (ql:quickload "cleric")
 
-(defpackage :lisp-on-yaws
+(defpackage lisp-on-yaws
   (:use :common-lisp)
   (:export 
    #:*yaws-server-node-name*
@@ -32,4 +32,4 @@
    #:*appmods*
    #:add-appmod-resource
    #:defhandler
-   #:generate-appmods)
+   #:generate-appmods))

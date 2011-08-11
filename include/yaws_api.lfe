@@ -316,9 +316,11 @@
     (out arg (http_request-method (arg-req arg)) path)))
 
 (defmacro gen_resources [node resources]
-	  ;(: io format '"~p ~p ~n" (list node resources)) 
 	  (let ((resource_bodies (: lists map (lambda [X] (make-resource-bodies X node)) resources)))
-	   ; (: io format '"~p ~n" (list resource_bodies))
-	    `(defun out ,@resource_bodies
-	       ([arg method path]
-		(tuple 'status 404)))))
+	    (let ((result `(defun out ,@resource_bodies
+			     ([arg method path]
+				   (tuple 'status 404)))))
+
+	      ;(: io format '"!!! ~p ~n" (list result))
+	      result)))
+	      

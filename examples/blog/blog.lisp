@@ -1,7 +1,9 @@
+(in-package "BLOG")
+
 (defparameter *posts-directory* (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 (defvar *post-headers* nil)
-(setf *yaws-server-node-name* "jon-VirtualBox")
-(setf *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
+(setf *yaws-server-node-name* "jon-desktop")
+(setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
 (defun generate-post-html (universal-time author title body)
   (multiple-value-bind (second minute hour date month year)  (decode-universal-time universal-time)
@@ -206,7 +208,7 @@
        (reply (cl-who:with-html-output-to-string (var)
 		(:html (:body (:B "Name already taken or name must be at least 3 characters")
 			      :br (:b (:a :href "/blog/register" "Try Again")))))))
-      ((string= password password2)
+      ((and (string= password password2) auth-code-valid)
        (add-password author password)
        (reply "/blog" :|redirect|))
       (T (reply (cl-who:with-html-output-to-string (var)

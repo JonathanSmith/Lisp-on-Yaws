@@ -1,3 +1,5 @@
+(in-package "LISP-ON-YAWS")
+
 (defvar *yaws-server-node-name*)
 (defvar *cookie-file*)
 (defvar *yaws-listener-thread*)
@@ -65,10 +67,21 @@
 
 (defvar +file-atom+ (cleric:make-atom "file"))
 
+(defun resource-formatter (resource)
+  (concatenate 'string 
+	       (apply #'concatenate 'string 
+		      (format nil "(~a ~a(" (first resource) (second resource))
+		      (mapcar (lambda (pathname-part) 
+				(if (symbolp pathname-part) 
+				    (format nil " ~a" pathname-part)
+				    (format nil " ~s" pathname-part))) (third resource)))
+	       "))"))
+
 (defun write-module-string (module-name node-name &rest resources)
   (let ((header (format nil "(defmodule ~a (export (out 1)))" module-name))
 	(include (format nil "(include-file \"include/yaws_api.lfe\")" ))
-	(gen-out (format nil "(gen_resources ~a (~{(~{~:s~^ ~})~}))" node-name resources)))
+	(gen-out (format nil "(gen_resources ~a ~a)" node-name (mapcar #'resource-formatter resources))))
+    (format t "~s~%" resources)
     (format nil "~a~%~a~%~a~%" header include gen-out)))
 
 (defun send-file-for-compilation (module-name file-data)
@@ -123,7 +136,7 @@
   (let ((page-result (gensym)))
     `(lambda (,path-var ,filename-var ,@args)
        (let ((,page-result (progn ,@body)))
-	 (cleric:send-static-page ,path-var ,filename-var ,page-result)))))
+	 (lisp-on-yaws:send-static-page ,path-var ,filename-var ,page-result)))))
 
 (defun parse-query (query)
   (mapcar (lambda (tuple)
@@ -172,12 +185,16 @@
 (defmacro defhandler ((mod type path) return-type &body body)
   (let* ((appname (appmod-path-name-gen mod type path))
 	 (args (remove-if-not #'symbolp path))
-	 (module-resource (list (intern appname) (intern (symbol-name type)) path)))
+	 (module-resource (list (make-symbol appname) (make-symbol (symbol-name type)) 
+				(mapcar (lambda (pathpart)
+					  (if (symbolp pathpart)
+					      (make-symbol (symbol-name pathpart))
+					      pathpart)) path))))
 
     `(progn
-       (cleric:add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) ',module-resource)
-       (cleric:register ,appname
-		 (easy-handler ,args ,return-type ,@body)))))
+       (lisp-on-yaws:add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) ',module-resource)
+       (lisp-on-yaws:register ,appname
+			      (easy-handler ,args ,return-type ,@body)))))
   
 (defun generate-appmods ()
   (maphash (lambda (mod resources)

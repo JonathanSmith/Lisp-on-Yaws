@@ -20,7 +20,7 @@ run() ->
     GConfList = [{id, Id}],
     Docroot = filename:absname("") ++ "/www",
     Ebin = filename:absname("") ++ "/ebin/",
-    SrcDir = filename:absname("") ++ "/src/lfe",
+    SrcDir = filename:absname("") ++ "/src/lfe/",
     SConfList = [{port, 8080},
                  {servername, "foobar"},
                  {listen, {0,0,0,0}},
