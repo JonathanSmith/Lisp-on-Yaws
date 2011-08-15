@@ -2,7 +2,7 @@
 
 (defparameter *posts-directory* (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 (defvar *post-headers* nil)
-(setf *yaws-server-node-name* "jon-desktop")
+(setf *yaws-server-node-name* "jon-VirtualBox")
 (setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
 (defun generate-post-html (universal-time author title body)
@@ -96,6 +96,23 @@
 (defun check-password (name password)
   (string= (gethash name *password-hash*) (obfuscate-password password)))
 
+(defmacro js-link (link div-id name)
+  (let ((glink (gensym))
+	(gdiv (gensym))
+	(gname (gensym)))
+    `(let ((,glink ,link)
+	   (,gdiv ,div-id)
+	   (,gname ,name))
+       (cl-who:with-html-output-to-string (,(gensym))
+	 (:a :href "#" :onclick  
+	     (ps:ps-inline*
+	      `($.get ,,glink
+		      (ps:create)
+		      (lambda (data)
+			(ps:chain ($ ,,gdiv) 
+				  (html data)))))
+	     (:b (cl-who:str ,gname)))))))
+
 (defhandler (blog get ("ymacs"))(:|html|)
   (reply (cl-who:with-html-output-to-string (var)
 	   (:html (:head (:title "Ymacs")
@@ -133,7 +150,11 @@
 				    (ps:create)
 				    (lambda (data)
 				      (ps:chain ($ "div#index") 
-						(html data)))))))))))))))
+						(html data))))))))))
+	     (:div :id "footer"
+		   (cl-who:str (js-link "/blog/register/" "div#blog" "Register")) :br
+		   (cl-who:str (js-link "/blog/post/" "div#blog" "Add A Post")))
+	     )))))
 
 (defhandler (blog get ("post")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
