@@ -5,6 +5,10 @@
 (setf *yaws-server-node-name* "jon-VirtualBox")
 (setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
+(defun timestamp ()
+  (multiple-value-bind (second minute hour date month year)  (decode-universal-time (get-universal-time))
+    (format nil "~a/~2,'0d/~2,'0d ~2,'0d:~2,'0d:~2,'0d" year month date hour minute second)))
+
 (defun generate-post-html (universal-time author title body)
   (multiple-value-bind (second minute hour date month year)  (decode-universal-time universal-time)
     (declare (ignore second))
@@ -156,7 +160,8 @@
 						(html data))))))))))
 	     (:div :id "footer"
 		   (cl-who:str (js-link "/blog/register/" "div#blog" "Register")) :br
-		   (cl-who:str (js-link "/blog/post/" "div#blog" "Add A Post")))
+		   (cl-who:str (js-link "/blog/post/" "div#blog" "Add A Post")) :br
+		   (cl-who:str (js-link "/blog/chat" "div#blog" "Chat")))
 	     )))))
 
 (defhandler (blog get ("post")) (:|html|)
@@ -239,6 +244,114 @@
       (T (reply (cl-who:with-html-output-to-string (var)
 		  (:html (:body (:B "Passwords do not match")
 				:br (:b (:a :href "/blog/register" "Try Again"))))))))))
+
+(let ((chat-mutex (sb-thread:make-mutex))
+      (chat-position 0)
+      (chat-length 20)
+      (chat-array (make-array 20 :initial-element nil))
+      (chat-reply-list nil))
+
+  (defun get-chat-text ()
+    (sb-thread:with-recursive-lock (chat-mutex)
+      (let ((position (mod chat-position chat-length))
+	    (text-list (list)))
+	(dotimes (i chat-length)
+	  (push (aref chat-array (mod (+ position i) chat-length)) text-list))
+	(apply #'concatenate 'string (nreverse text-list)))))
+
+  (defun log-chat-text (string) string)
+
+  (defun set-chat-text (string)
+    (sb-thread:with-recursive-lock (chat-mutex)
+      (let ((current-position (mod chat-position chat-length)))
+	(when (aref chat-array current-position)
+	  (log-chat-text (aref chat-array current-position)))
+	(setf (aref chat-array current-position) string)
+	(incf chat-position)))
+    (reply-chat))
+
+  (defun queue-request () 
+    (sb-thread:with-recursive-lock (chat-mutex)
+      (push (get-reply-information) chat-reply-list)))
+
+  (defun reply-chat ()
+    (sb-thread:with-recursive-lock (chat-mutex)
+      (reply-all (get-chat-text) chat-reply-list :|html|)
+      (setf chat-reply-list nil)))
+
+  (defun init-chat-reply-thread ()
+    (sb-thread:make-thread (lambda () 
+			       (do ()
+				   (NIL)
+				 (sleep 1)
+				 (reply-chat))))))
+
+(defhandler (blog get ("chat")) (:|html|)
+  (reply (cl-who:with-html-output-to-string (val)
+	   (:html (:body 
+		   (:script :type "text/javascript" 
+			    (cl-who:str
+			     (ps:ps 
+			       
+			       (defun chat-loop-init ()
+				 ($.get "/blog/chat/instant"
+					(ps:create)
+					(lambda (data)
+					  (ps:chain ($ "div#chatwindow")
+						    (html data))
+					  (chat-loop))))
+			       (defun chat-loop ()
+				 ($.get "/blog/chat/wait"
+					(ps:create)
+					(lambda (data)
+					  (ps:chain ($ "div#chatwindow") 
+						    (html data))
+					  (chat-loop))))
+			      
+			       (ps:chain 
+				($ document) 
+				(ready
+				 (chat-loop-init))))))
+		   (:div :id "chatwindow")
+			 :br
+			 "User Name: "
+			 (:input :id "name" :type "text" :name "name")
+			 :br
+			 "Message: "
+			 (:input :id "message" :type "text" :name "message")
+			 :br
+			 (:input :type "submit" 
+				 :value "Send"
+				 :onclick (ps:ps-inline 
+					   (let ((post (lambda () 
+							 ($.post
+							  "/blog/chat"
+							  (ps:create 
+							   :message 
+							   (ps:chain 
+							    ($ "input#message")
+							    (val))
+							   :name
+							   (ps:chain
+							    ($ "input#name")
+							    (val))))
+							 (ps:chain ($ "input#message") (val "")))))
+					     (post)))))))))
+
+(defhandler (blog get ("chat" "wait")) (:|html|)
+  (queue-request))
+
+(defhandler (blog get ("chat" "instant")) (:|html|)
+  (reply (get-chat-text)))
+
+(defhandler (blog post ("chat")) (:|html|)
+  (reply "")
+  (let* ((q (parse-query *query*))
+	 (name (second (assoc "name" q :test #'string=)))
+	 (message (second (assoc "message" q :test #'string=))))
+    (format t "~s~%" (list name message))
+    (when (and name message)
+      (set-chat-text (format nil "~a ~a: ~a <br></br>" (timestamp) name message)))))
 
 (defhandler (blog get ("file")) (:|html|)
   (reply 

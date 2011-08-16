@@ -105,10 +105,33 @@
 (defvar *reply-type*)
 (defvar *content-type*)
 
-(defun reply (value &optional (reply-type *reply-type*) (mime-type *content-type*))
+(defun reply (value &optional
+	      (reply-type *reply-type*)
+	      (mime-type *content-type*))
   (if (eql reply-type :|content|)
       (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type mime-type value)))
       (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type value)))))
+
+(defun reply-all (value dests-and-refs &optional 
+		  (reply-type *reply-type*)
+		  (mime-type *content-type*))
+  (let ((reply-function (if (eql reply-type :|content|) 
+			    (lambda (dest-ref) 
+			      (destructuring-bind (dest ref) dest-ref
+				(cleric:send 
+				 dest 
+				 (cleric:tuple
+				  ref
+				  (cleric:tuple reply-type mime-type value)))))
+			    (lambda (dest-ref) 
+			      (destructuring-bind (dest ref) dest-ref
+				(cleric:send 
+				 dest 
+				 (cleric:tuple ref (cleric:tuple reply-type value))))))))
+    (mapcar reply-function dests-and-refs)))
+
+(defun get-reply-information ()
+  (list *dest* *ref*))
 
 (defmacro easy-handler ((&rest args) (&optional (default-reply-type :|html|)
 						(default-content-type nil)) &body body)

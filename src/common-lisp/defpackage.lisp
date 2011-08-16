@@ -25,6 +25,8 @@
    #:send-static-page
    #:add-appmod
    #:reply
+   #:reply-all
+   #:get-reply-information
    #:easy-handler
    #:static-page-generator
    #:parse-query
