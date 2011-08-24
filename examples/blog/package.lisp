@@ -3,6 +3,7 @@
   (ql:quickload "parenscript")
   (ql:quickload "cl-ppcre")
   (ql:quickload "cl-markdown")
+  (ql:quickload "uuid")
   (asdf:operate 'asdf:load-op :lisp-on-yaws))
 
 (defpackage blog

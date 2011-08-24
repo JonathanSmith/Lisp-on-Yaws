@@ -6,8 +6,14 @@
 (setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
 (defun timestamp ()
-  (multiple-value-bind (second minute hour date month year)  (decode-universal-time (get-universal-time))
+  (multiple-value-bind (second minute hour date month year)  
+      (decode-universal-time (get-universal-time))
     (format nil "~a/~2,'0d/~2,'0d ~2,'0d:~2,'0d:~2,'0d" year month date hour minute second)))
+
+(defun uuid-string (&optional (uuid (uuid:make-v4-uuid)))
+  (with-open-stream (s (make-string-output-stream))
+    (uuid:print-bytes s uuid)
+    (get-output-stream-string s)))
 
 (defun generate-post-html (universal-time author title body)
   (multiple-value-bind (second minute hour date month year)  (decode-universal-time universal-time)
@@ -17,7 +23,10 @@
 			  (get-output-stream-string s)))
 	   (date-string (format nil "At ~a/~2,'0d/~2,'0d ~2,'0d:~2,'0d" year month date hour minute))
 	   (page (cl-who:with-html-output-to-string (var)
-		   (:h2 (:a :href (format nil "/posts/~a.html" universal-time) (cl-who:str title)))
+		   (:h2 
+		    (:a :href 
+			(format nil "/posts/~a.html" universal-time)
+			(cl-who:str title)))
 		   (cl-who:str body-string)
 		   (:h4 (cl-who:str author))
 		   (:h4 (cl-who:str date-string)))))
@@ -66,14 +75,7 @@
 		     (let ((link (format nil "/posts/~a.html" time)))
 		       (cl-who:htm 
 			(:li 
-			 (:a :href "#" :onclick  
-			     (ps:ps-inline*
-			      `($.get ,link 
-				      (ps:create)
-				      (lambda (data)
-					(ps:chain ($ "div#blog") 
-						  (html data)))) #\")
-			     (:b (cl-who:str title)))))))))
+			 (named-link var link "div#blog" title)))))))
 	   (when (first *post-headers*)
 	     (destructuring-bind (time author title) (first *post-headers*)
 	       (declare (ignore author title))
@@ -103,22 +105,18 @@
 (defun check-password (name password)
   (string= (gethash name *password-hash*) (obfuscate-password password)))
 
-(defmacro js-link (link div-id name)
-  (let ((glink (gensym))
-	(gdiv (gensym))
-	(gname (gensym)))
-    `(let ((,glink ,link)
-	   (,gdiv ,div-id)
-	   (,gname ,name))
-       (cl-who:with-html-output-to-string (,(gensym))
-	 (:a :href "#" :onclick  
-	     (ps:ps-inline*
-	      `($.get ,,glink
-		      (ps:create)
-		      (lambda (data)
-			(ps:chain ($ ,,gdiv) 
-				  (html data)))))
-	     (:b (cl-who:str ,gname)))))))
+(ps:defpsmacro js-link (link div-id)
+  `($.get ,link
+	  (ps:create)
+	  (lambda (data)
+	    (ps:chain ($ ,div-id) 
+		      (html data)))))
+ 
+(defun named-link (stream link div-id name)
+  (cl-who:with-html-output (stream)
+    (:a :href "#" :onclick  
+	(ps:ps-inline* `(js-link ,link ,div-id))
+	(cl-who:str name))))
 
 (defhandler (blog get ("ymacs"))(:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -126,15 +124,15 @@
 			 (:link :rel "stylesheet" :type "text/css" :href "/dl/css/default.css")
 			 (:link :rel "stylesheet" :type "text/css" :href "/test.css")
 			 (:link :rel "stylesheet" :type "text/css" :href "/ymacs/css/ymacs.css"))
-		  (:body 
-		   (:center :style "margin-top: 10em" :id "x-loading"(:h1 (:tt "Loading")))
-		   (:script "window.Dynarc_base_Url = \"/dl\"; window.YMACS_SRC_PATH = \"/ymacs/js/\"")
-		   (:script :src "/dl/js/thelib.js")
-		   (:script :src "/ymacs/js/ymacs.js")
-		   (:div :style "display: none"
-			 (:div :id "browse-warning" :style "padding: 1em; width 20em;"
-			       (:b "ymacs disclaimer blah")))
-		   (:script :src "/test2.js"))))))
+
+		  (:center :style "margin-top: 10em" :id "x-loading"(:h1 (:tt "Loading")))
+		  (:script "window.Dynarc_base_Url = \"/dl\"; window.YMACS_SRC_PATH = \"/ymacs/js/\"")
+		  (:script :src "/dl/js/thelib.js")
+		  (:script :src "/ymacs/js/ymacs.js")
+		  (:div :style "display: none"
+			(:div :id "browse-warning" :style "padding: 1em; width 20em;"
+			      (:b "ymacs disclaimer blah")))
+		  (:script :src "/test2.js")))))
 
 (defhandler (blog get ()) (:|html|)
   (reply 
@@ -143,6 +141,7 @@
 		   (:link :rel "stylesheet" :href "/blog.css"))
 	    (:body 
 	     (:h1 "Jon's Blog")
+	     (:div :id "user")
 	     (:div :id "index")
 	     (:div :id "blog")
 	     (:script :src "/jquery.min.js")
@@ -159,47 +158,61 @@
 				      (ps:chain ($ "div#index") 
 						(html data))))))))))
 	     (:div :id "footer"
-		   (cl-who:str (js-link "/blog/register/" "div#blog" "Register")) :br
-		   (cl-who:str (js-link "/blog/post/" "div#blog" "Add A Post")) :br
-		   (cl-who:str (js-link "/blog/chat" "div#blog" "Chat")))
-	     )))))
+		   (named-link var "/blog/register/" "div#blog" "Register") :br
+		   (named-link var "/blog/post/" "div#blog" "Add A Post") :br
+		   (named-link var "/blog/chat/" "div#blog" "Chat") :br
+		   (named-link var "/blog/login/" "div#blog" "Login"))
+	     (:input :type "hidden" :id "session-id" :name "session-id"))))))
 
 (defhandler (blog get ("post")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
 	   (:html 
 	    (:title "A Blog") 
-	    (:body  (:B "Not Much Here")
-		    (:form :action "/blog/post" :method "POST"
-			   "Author"
-			   :br
-			   (:input :type "text" :name "author")
-			   :br
-			   "Password"
-			   :br
-			   (:input :type "password" :name "password")
-			   :br
-			   "Title"
-			   (:input :type "text" :name "title")
-			   :br
-			   "Text"
-			   :br
-			   (:textarea :row "6" :cols "60" :name "post")
-			   :br
-			   (:input :type "submit" :value "Submit")))))))
+	    (:body  
+	     (:script :type "text/javascript"
+		      (cl-who:str
+		       (ps:ps (defpostfn make-post (blog post)
+				((session-id title text)
+				 (ps:create "session-id" session-id
+					    "title" title
+					    "post" text))
+				((data textatus qxhr)
+				 (js-link "/blog/" "div#blog")
+				 (js-link "/posts/index.html" "div#index")
+				 )))))
+
+	     (:B "Not Much Here")		   
+	     :br
+	     "Title"
+	     (:input :type "text" :name "title" :id "title")
+	     :br
+	     "Text"
+	     :br
+	     (:textarea :row "6" :cols "60" :name "post-text" :id "post-text")
+	     :br
+	     (:input :type "submit" :value "Submit" :onclick
+		     (ps:ps-inline 
+		      (make-post (ps:chain ($ "input#session-id")
+					   (val))
+				 (ps:chain ($ "input#title")
+					   (val))
+				 (ps:chain ($ "textarea#post-text")
+					   (val))))))))))
 
 (defhandler (blog post ("post")) (:|html|)
   (let* ((q (parse-query *query*))
-	 (author (second (assoc "author" q :test #'string=)))
-	 (password (second (assoc "password" q :test #'string=)))
+	 (session-id (second (assoc "session-id" q :test #'string=)))
 	 (title (second (assoc "title" q :test #'string=)))
 	 (post (second (assoc "post" q :test #'string=))))
-    (if (and (and author password title post)
-	     (check-password author password))
-	(let ((pst-file (generate-post-pst-file title author post)))
-	  (generate-post-from-file pst-file)
-	  (generate-index)
-	  (reply "/blog/" :|redirect|))
-	(reply "/blog/" :|redirect|))))
+    (format t "~s~%" (list *query* q session-id title post))
+    (let ((login-info (check-login session-id)))
+      (if (and login-info title post)	
+	  (let* ((author (login-info-author login-info))
+		 (pst-file (generate-post-pst-file title author post)))
+	    (generate-post-from-file pst-file)
+	    (generate-index)
+	    (reply "post added"))
+	  (reply "post error")))))
 
 (defhandler (blog get ("register")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -245,6 +258,73 @@
 		  (:html (:body (:B "Passwords do not match")
 				:br (:b (:a :href "/blog/register" "Try Again"))))))))))
 
+(defhandler (blog get ("login")) (:|html|)
+  (reply (cl-who:with-html-output-to-string (val)
+	   (:body 
+	    (:script 
+	     :type "text/javascript" 
+	     (cl-who:str
+	      (ps:ps 
+		(defpostfn login (blog login) 
+		    ((user-id password) 
+		     (ps:create "author" user-id "password" password))
+		  ((data texstatus qxhr)
+		   (ps:chain ($ "input#session-id") (val data))
+		   (ps:chain ($ "div#user") (html "Logged In"))
+		   ;(alert (ps:chain ($ "input#session-id") (val)))
+		   )))))
+	    "Login Name"
+	    :br
+	    (:input :type "text" :id "author" :name "author") :br
+	    "Password"
+	    :br
+	    (:input :type "password" :id "password" :name "password") :br
+	    (:input :type "submit" :value "Login" :onclick 
+		    (ps:ps-inline (login
+				   (ps:chain ($ "input#author")
+					     (val))
+				   (ps:chain ($ "input#password")
+					     (val)))))))))
+
+(defvar *logged-in-hash* (make-hash-table :test 'equalp))
+
+(defstruct login-info
+  (author)
+  (uuid)
+  (timestamp))
+
+(defun create-login (author password)
+  (when (check-password author password)
+    (let* ((uuid (uuid-string))
+	   (login (make-login-info :author author :uuid uuid :timestamp (get-universal-time))))
+
+      (setf (gethash uuid *logged-in-hash*) login)
+
+      uuid)))
+
+(defvar *login-timeout* 
+  (encode-universal-time 1 20 2 1 1 1))
+
+(defun check-timeout (uuid)
+  (> (- (login-info-timestamp uuid) (get-universal-time))
+     *login-timeout*)
+  t)
+
+(defun check-login (uuid)
+  (let ((login-info (gethash uuid *logged-in-hash*)))
+    (when (and login-info (check-timeout login-info))
+      login-info)))
+
+(defhandler (blog post ("login")) (:|html|)
+  (let ((q (parse-query *query*)))
+    (let ((author (second (assoc "author" q  :test #'string=)))
+	  (password (second (assoc "password" q :test #'string=))))
+      (let ((uuid (create-login author password)))
+	(if uuid 
+	    (reply uuid)
+	    (reply ""))))))
+	 
+
 (let ((chat-mutex (sb-thread:make-mutex))
       (chat-position 0)
       (chat-length 20)
@@ -274,6 +354,23 @@
     (sb-thread:with-recursive-lock (chat-mutex)
       (push (get-reply-information) chat-reply-list)))
 
+(ps:defpsmacro defpostfn (name path 
+			  (args1 &body body1) 
+			  (args2 &body body2))
+  (let ((strings (mapcar #'(lambda (symbol) (string-downcase (symbol-name symbol))) path)))
+    (let ((path-name (reduce (lambda (name1 name2)
+			       (format nil "~a~a/" name1 name2)) 
+			     (cons (format nil "/~a/" (car strings))
+				   (cdr strings))))
+	  (post-result (gensym)))
+      `(defun ,name (,@args1)
+	 (let ((,post-result (progn ,@body1)))
+	   ($.post 
+	    ,path-name
+	    ,post-result
+	    (lambda (,@args2) ,@body2)))))))
+
+
   (defun reply-chat ()
     (sb-thread:with-recursive-lock (chat-mutex)
       (reply-all (get-chat-text) chat-reply-list :|html|)
@@ -291,82 +388,88 @@
 	   (:html (:body 
 		   (:script :type "text/javascript" 
 			    (cl-who:str
-			     (ps:ps 
-			       
+			     (ps:ps
 			       (defun chat-loop-init ()
 				 ($.get "/blog/chat/instant"
-					(ps:create)
+					(ps:create :session-id 
+						   (ps:chain ($ "input#session-id")
+							     (val)))
 					(lambda (data)
 					  (ps:chain ($ "div#chatwindow")
 						    (html data))
 					  (chat-loop))))
 			       (defun chat-loop ()
 				 ($.get "/blog/chat/wait"
-					(ps:create)
+					(ps:create :session-id 
+						   (ps:chain ($ "input#session-id")
+							     (val)))
 					(lambda (data)
 					  (ps:chain ($ "div#chatwindow") 
 						    (html data))
 					  (chat-loop))))
+
+			       (defun key-stroke-update (event)
+				 (if (or (= (ps:chain event char-code) 13)
+					 (= (ps:chain event key-code) 13))
+				     (post)))
+
+			       (defun post () 
+				 ($.post
+				  "/blog/chat"
+				  (ps:create 
+				   :message 
+				   (ps:chain 
+				    ($ "input#message")
+				    (val))
+				   :session-id
+				   (ps:chain 
+				    ($ "input#session-id")
+				    (val))
+				   ))
+				 (ps:chain ($ "input#message") (val "")))
 			      
 			       (ps:chain 
 				($ document) 
 				(ready
 				 (chat-loop-init))))))
 		   (:div :id "chatwindow")
-			 :br
-			 "User Name: "
-			 (:input :id "name" :type "text" :name "name")
-			 :br
-			 "Message: "
-			 (:input :id "message" :type "text" :name "message")
-			 :br
-			 (:input :type "submit" 
-				 :value "Send"
-				 :onclick (ps:ps-inline 
-					   (let ((post (lambda () 
-							 ($.post
-							  "/blog/chat"
-							  (ps:create 
-							   :message 
-							   (ps:chain 
-							    ($ "input#message")
-							    (val))
-							   :name
-							   (ps:chain
-							    ($ "input#name")
-							    (val))))
-							 (ps:chain ($ "input#message") (val "")))))
-					     (post)))))))))
+		   :br
+		   "Message: "
+		   (:input 
+		    :id "message"
+		    :type "text"
+		    :name "message"
+		    :onkeypress (ps:ps-inline (key-stroke-update event)))
+		   :br
+		   (:input :type "submit" 
+			   :value "Send"
+			   :onclick (ps:ps-inline 
+				     (post))))))))
 
 (defhandler (blog get ("chat" "wait")) (:|html|)
-  (queue-request))
+  (let* ((q (parse-query *query*))
+	 (session-id (second (assoc "session-id" q :test #'string=))))
+    (when (check-login session-id)
+      (queue-request))))
 
 (defhandler (blog get ("chat" "instant")) (:|html|)
-  (reply (get-chat-text)))
+  (let* ((q (parse-query *query*))
+	 (session-id (second (assoc "session-id" q :test #'string=))))
+    (when (check-login session-id)
+      (reply (get-chat-text)))))
 
 (defhandler (blog post ("chat")) (:|html|)
   (reply "")
   (let* ((q (parse-query *query*))
-	 (name (second (assoc "name" q :test #'string=)))
+	 (session-id (second (assoc "session-id" q :test #'string=)))
 	 (message (second (assoc "message" q :test #'string=))))
-    (format t "~s~%" (list name message))
-    (when (and name message)
-      (set-chat-text (format nil "~a ~a: ~a <br></br>" (timestamp) name message)))))
-
-(defhandler (blog get ("file")) (:|html|)
-  (reply 
-   (cl-who:with-html-output-to-string (var)
-     (:html (:body (:form :action "/blog/file"
-			  :enctype "multipart/form-data"
-			  :method "post"
-			  (:p "What is your name?" (:input :type "text" :name "name_of_sender")
-			      "What files are you sending?" (:input :type "file" :name "name_of_files"))
-			  (:input :type "submit" :value "Submit")))))))
-
-(defhandler (blog post-multipart ("file")) (:|html|)
-  (reply "done!")
-  (format t "~s~%" *query*)
-  (format t "~s~%" (parse-multipart-query *query*)))
+    (let ((login-info (check-login session-id)))
+      (when (and login-info message)
+	(let ((name (login-info-author login-info)))
+	  (set-chat-text (cl-who:conc
+			  (cl-who:escape-string-iso-8859-1 
+			   (format nil "~a ~a: ~a" (timestamp) name message))
+			  "<br></br>")))))))
 
 (defun blog-main ()
   (init-server-connection)
