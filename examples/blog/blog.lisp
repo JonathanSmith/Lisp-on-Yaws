@@ -2,7 +2,7 @@
 
 (defparameter *posts-directory* (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 (defvar *post-headers* nil)
-(setf *yaws-server-node-name* "jon-VirtualBox")
+(setf *yaws-server-node-name* "jon-desktop")
 (setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
 (defun timestamp ()
@@ -64,6 +64,8 @@
 	(format stream "~a" lines))
       post-path)))
 
+(defvar *most-recent-post* "")
+
 (defun generate-index ()
   (let ((index-page 
 	 (cl-who:with-html-output-to-string (var)
@@ -77,6 +79,7 @@
 			(:li 
 			 (named-link var link "div#blog" title)))))))
 	   (when (first *post-headers*)
+	     (setf *most-recent-post* (format nil "~a" (first (first *post-headers*))))
 	     (destructuring-bind (time author title) (first *post-headers*)
 	       (declare (ignore author title))
 	       (let ((link (format nil "/posts/~a.html" time)))
@@ -111,6 +114,22 @@
 	  (lambda (data)
 	    (ps:chain ($ ,div-id) 
 		      (html data)))))
+
+(ps:defpsmacro defpostfn (name path 
+			  (args1 &body body1) 
+			  (args2 &body body2))
+  (let ((strings (mapcar #'(lambda (symbol) (string-downcase (symbol-name symbol))) path)))
+    (let ((path-name (reduce (lambda (name1 name2)
+			       (format nil "~a~a/" name1 name2)) 
+			     (cons (format nil "/~a/" (car strings))
+				   (cdr strings))))
+	  (post-result (gensym)))
+      `(defun ,name (,@args1)
+	 (let ((,post-result (progn ,@body1)))
+	   ($.post 
+	    ,path-name
+	    ,post-result
+	    (lambda (,@args2) ,@body2)))))))
  
 (defun named-link (stream link div-id name)
   (cl-who:with-html-output (stream)
@@ -118,7 +137,7 @@
 	(ps:ps-inline* `(js-link ,link ,div-id))
 	(cl-who:str name))))
 
-(defhandler (blog get ("ymacs"))(:|html|)
+#|(defhandler (blog get ("ymacs"))(:|html|)
   (reply (cl-who:with-html-output-to-string (var)
 	   (:html (:head (:title "Ymacs")
 			 (:link :rel "stylesheet" :type "text/css" :href "/dl/css/default.css")
@@ -132,7 +151,10 @@
 		  (:div :style "display: none"
 			(:div :id "browse-warning" :style "padding: 1em; width 20em;"
 			      (:b "ymacs disclaimer blah")))
-		  (:script :src "/test2.js")))))
+		  (:script :src "/test2.js")))))|#
+
+(defhandler (blog get ("last_post")) (:|content| "text/html")
+    (reply *most-recent-post*))
 
 (defhandler (blog get ()) (:|html|)
   (reply 
@@ -152,17 +174,32 @@
 			  ($ document) 
 			  (ready
 			   (lambda ()
-			     ($.get "/posts/index.html"
-				    (ps:create)
-				    (lambda (data)
-				      (ps:chain ($ "div#index") 
-						(html data))))))))))
+			     (check-last-post)
+			     (poll-index))))
+
+			 (defun check-last-post ()
+			   (let ((this-id (ps:chain ($ "input#latest") (val)))
+				 (server-id ($.get "/blog/last_post")))
+			     ;(alert this-id)
+			     ;(alert server-id)
+			     (unless (eql this-id server-id)
+			       ($.get "/posts/index.html"
+				      (ps:create)
+				      (lambda (data)
+					(ps:chain ($ "div#index")
+						  (html data))))
+			       (ps:chain ($ "input#latest") (val server-id)))))
+			     
+			 (defun poll-index ()
+			   (ps:var timer (set-interval "checkLastPost()" 3000))))))
 	     (:div :id "footer"
 		   (named-link var "/blog/register/" "div#blog" "Register") :br
 		   (named-link var "/blog/post/" "div#blog" "Add A Post") :br
 		   (named-link var "/blog/chat/" "div#blog" "Chat") :br
 		   (named-link var "/blog/login/" "div#blog" "Login"))
-	     (:input :type "hidden" :id "session-id" :name "session-id"))))))
+	     (:input :type "hidden" :id "session-id" :name "session-id")
+	     (:input :type "hidden" :id "latest" :name "latest")
+	     )))))
 
 (defhandler (blog get ("post")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -354,21 +391,7 @@
     (sb-thread:with-recursive-lock (chat-mutex)
       (push (get-reply-information) chat-reply-list)))
 
-(ps:defpsmacro defpostfn (name path 
-			  (args1 &body body1) 
-			  (args2 &body body2))
-  (let ((strings (mapcar #'(lambda (symbol) (string-downcase (symbol-name symbol))) path)))
-    (let ((path-name (reduce (lambda (name1 name2)
-			       (format nil "~a~a/" name1 name2)) 
-			     (cons (format nil "/~a/" (car strings))
-				   (cdr strings))))
-	  (post-result (gensym)))
-      `(defun ,name (,@args1)
-	 (let ((,post-result (progn ,@body1)))
-	   ($.post 
-	    ,path-name
-	    ,post-result
-	    (lambda (,@args2) ,@body2)))))))
+
 
 
   (defun reply-chat ()

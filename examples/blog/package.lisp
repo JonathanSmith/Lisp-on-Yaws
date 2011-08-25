@@ -4,6 +4,7 @@
   (ql:quickload "cl-ppcre")
   (ql:quickload "cl-markdown")
   (ql:quickload "uuid")
+  (ql:quickload "cl-json")
   (asdf:operate 'asdf:load-op :lisp-on-yaws))
 
 (defpackage blog
