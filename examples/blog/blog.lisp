@@ -2,8 +2,8 @@
 
 (defparameter *posts-directory* (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 (defvar *post-headers* nil)
-(setf *yaws-server-node-name* "jon-desktop")
-(setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
+(setf *yaws-server-node-name* "jon-VirtualBox")
+(setf *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
 
 (defun timestamp ()
   (multiple-value-bind (second minute hour date month year)  
@@ -67,6 +67,8 @@
 (defvar *most-recent-post* "")
 
 (defun generate-index ()
+  (when (first *post-headers*)
+    (setf *most-recent-post* (format nil "~a" (first (first *post-headers*)))))
   (let ((index-page 
 	 (cl-who:with-html-output-to-string (var)
 	   (:ul :class "navbar"
@@ -78,22 +80,10 @@
 		       (cl-who:htm 
 			(:li 
 			 (named-link var link "div#blog" title)))))))
-	   (when (first *post-headers*)
-	     (setf *most-recent-post* (format nil "~a" (first (first *post-headers*))))
-	     (destructuring-bind (time author title) (first *post-headers*)
-	       (declare (ignore author title))
-	       (let ((link (format nil "/posts/~a.html" time)))
-		 (cl-who:htm 
-		  (:script 
-		   (cl-who:str 
-		    (ps:ps-inline*
-		     `($.get ,link 
-			     (ps:create)
-			     (lambda (data)
-			       (ps:chain ($ "div#blog") 
-					 (html data)))) #\"))))))))))
+	   (:input :type "hidden" :id "latest" :name "latest" :value (cl-who:str *most-recent-post*)))))
+    (send-static-page "posts" "index.html" index-page)
     
-    (send-static-page "posts" "index.html" index-page)))
+    nil))
 
 (defparameter *salt* "PASSWORD")
 (defvar *password-hash* (make-hash-table :test #'equalp))
@@ -153,53 +143,57 @@
 			      (:b "ymacs disclaimer blah")))
 		  (:script :src "/test2.js")))))|#
 
-(defhandler (blog get ("last_post")) (:|content| "text/html")
+(defhandler (blog get ("last_post")) (:|content| "application/json")
     (reply *most-recent-post*))
 
 (defhandler (blog get ()) (:|html|)
   (reply 
    (cl-who:with-html-output-to-string (var)
-     (:html (:head (:title "Jon's Blog")
+     (:html (:head (:title "Jon Feed")
 		   (:link :rel "stylesheet" :href "/blog.css"))
 	    (:body 
-	     (:h1 "Jon's Blog")
+	     (:h1 "JonFeed")
+	     (:h4 "For all your Jon News")
 	     (:div :id "user")
 	     (:div :id "index")
 	     (:div :id "blog")
 	     (:script :src "/jquery.min.js")
-	     (:script :type "text/javascript"
-		      (cl-who:str 
-		       (ps:ps 
-			 (ps:chain 
-			  ($ document) 
-			  (ready
-			   (lambda ()
-			     (check-last-post)
-			     (poll-index))))
+	     (let ((link (format nil "/posts/~a.html" *most-recent-post*)))
+	       (cl-who:htm
+		(:script :type "text/javascript"
+			 (cl-who:str (ps:ps* `(defun get-init-post ()
+						(js-link ,link "div#blog"))))
+			 (cl-who:str 
+			  (ps:ps 
+			    (ps:chain 
+			     ($ document) 
+			     (ready
+			      (lambda ()
+				(get-init-post)
+				(check-last-post)
+				(poll-index))))
 
-			 (defun check-last-post ()
-			   (let ((this-id (ps:chain ($ "input#latest") (val)))
-				 (server-id ($.get "/blog/last_post")))
-			     ;(alert this-id)
-			     ;(alert server-id)
-			     (unless (eql this-id server-id)
-			       ($.get "/posts/index.html"
-				      (ps:create)
-				      (lambda (data)
-					(ps:chain ($ "div#index")
-						  (html data))))
-			       (ps:chain ($ "input#latest") (val server-id)))))
+			    (defun check-last-post ()
+			      ($.get "/blog/last_post"  
+				     (ps:create)
+				     (lambda (server-id)
+				       (let ((this-id (ps:chain ($ "input#latest") (val))))
+					 (unless (equal this-id server-id)
+					   ($.get "/posts/index.html"
+						  (ps:create)
+						  (lambda (data)
+						    (ps:chain 
+						     ($ "div#index")
+						     (html data)))))))))
 			     
-			 (defun poll-index ()
-			   (ps:var timer (set-interval "checkLastPost()" 3000))))))
-	     (:div :id "footer"
-		   (named-link var "/blog/register/" "div#blog" "Register") :br
-		   (named-link var "/blog/post/" "div#blog" "Add A Post") :br
-		   (named-link var "/blog/chat/" "div#blog" "Chat") :br
-		   (named-link var "/blog/login/" "div#blog" "Login"))
-	     (:input :type "hidden" :id "session-id" :name "session-id")
-	     (:input :type "hidden" :id "latest" :name "latest")
-	     )))))
+			    (defun poll-index ()
+			      (ps:var timer (set-interval "checkLastPost()" 30000))))))
+		(:div :id "footer"
+		      (named-link var "/blog/register/" "div#blog" "Register") :br
+		      (named-link var "/blog/post/" "div#blog" "Add A Post") :br
+		      (named-link var "/blog/chat/" "div#blog" "Chat") :br
+		      (named-link var "/blog/login/" "div#blog" "Login"))
+		(:input :type "hidden" :id "session-id" :name "session-id"))))))))
 
 (defhandler (blog get ("post")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -213,10 +207,9 @@
 				 (ps:create "session-id" session-id
 					    "title" title
 					    "post" text))
-				((data textatus qxhr)
+				((data textstatus qxhr)
 				 (js-link "/blog/" "div#blog")
-				 (js-link "/posts/index.html" "div#index")
-				 )))))
+				 (js-link "/posts/index.html" "div#index"))))))
 
 	     (:B "Not Much Here")		   
 	     :br
@@ -241,7 +234,6 @@
 	 (session-id (second (assoc "session-id" q :test #'string=)))
 	 (title (second (assoc "title" q :test #'string=)))
 	 (post (second (assoc "post" q :test #'string=))))
-    (format t "~s~%" (list *query* q session-id title post))
     (let ((login-info (check-login session-id)))
       (if (and login-info title post)	
 	  (let* ((author (login-info-author login-info))
