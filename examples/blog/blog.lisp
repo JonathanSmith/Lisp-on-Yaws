@@ -1,7 +1,9 @@
 (in-package "BLOG")
 
-(defparameter *posts-directory* (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
+(defparameter *posts-directory* 
+  (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 (defvar *post-headers* nil)
+
 (setf *yaws-server-node-name* "jon-VirtualBox")
 (setf *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
 
@@ -86,17 +88,18 @@
     nil))
 
 (defparameter *salt* "PASSWORD")
-(defvar *password-hash* (make-hash-table :test #'equalp))
 
 (defun obfuscate-password (password)
   (let* ((salted (concatenate 'string *salt* password)))
     (map 'string #'code-char (md5::MD5SUM-SEQUENCE salted))))
 
 (defun add-password (name password)
-  (setf (gethash name *password-hash*) (obfuscate-password password)))
+  (redis:with-connection ()
+    (redis:red-set name (obfuscate-password password))))
 
 (defun check-password (name password)
-  (string= (gethash name *password-hash*) (obfuscate-password password)))
+  (redis:with-connection ()
+    (string= (redis:red-get name) (obfuscate-password password))))
 
 (ps:defpsmacro js-link (link div-id)
   `($.get ,link
@@ -126,22 +129,6 @@
     (:a :href "#" :onclick  
 	(ps:ps-inline* `(js-link ,link ,div-id))
 	(cl-who:str name))))
-
-#|(defhandler (blog get ("ymacs"))(:|html|)
-  (reply (cl-who:with-html-output-to-string (var)
-	   (:html (:head (:title "Ymacs")
-			 (:link :rel "stylesheet" :type "text/css" :href "/dl/css/default.css")
-			 (:link :rel "stylesheet" :type "text/css" :href "/test.css")
-			 (:link :rel "stylesheet" :type "text/css" :href "/ymacs/css/ymacs.css"))
-
-		  (:center :style "margin-top: 10em" :id "x-loading"(:h1 (:tt "Loading")))
-		  (:script "window.Dynarc_base_Url = \"/dl\"; window.YMACS_SRC_PATH = \"/ymacs/js/\"")
-		  (:script :src "/dl/js/thelib.js")
-		  (:script :src "/ymacs/js/ymacs.js")
-		  (:div :style "display: none"
-			(:div :id "browse-warning" :style "padding: 1em; width 20em;"
-			      (:b "ymacs disclaimer blah")))
-		  (:script :src "/test2.js")))))|#
 
 (defhandler (blog get ("last_post")) (:|content| "application/json")
     (reply *most-recent-post*))
@@ -193,7 +180,9 @@
 		      (named-link var "/blog/post/" "div#blog" "Add A Post") :br
 		      (named-link var "/blog/chat/" "div#blog" "Chat") :br
 		      (named-link var "/blog/login/" "div#blog" "Login"))
-		(:input :type "hidden" :id "session-id" :name "session-id"))))))))
+		(:input :type "hidden" :id "session-id" :name "session-id")
+		(:input :type "hidden" :id "user-id" :name "user-id" :value (cl-who:str user-id))
+		)))))))
 
 (defhandler (blog get ("post")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -276,7 +265,7 @@
 	  (password2 (second (assoc "password2" q :test #'string=)))
 	  (auth-code-valid (and auth-code (string= auth-code *auth-code*))))
     (cond 
-      ((or (gethash author *password-hash*) (< (length author) 3))
+      ((or (redis:with-connection () (redis:red-get author)) (< (length author) 3))
        (reply (cl-who:with-html-output-to-string (var)
 		(:html (:body (:B "Name already taken or name must be at least 3 characters")
 			      :br (:b (:a :href "/blog/register" "Try Again")))))))
@@ -326,7 +315,6 @@
   (when (check-password author password)
     (let* ((uuid (uuid-string))
 	   (login (make-login-info :author author :uuid uuid :timestamp (get-universal-time))))
-
       (setf (gethash uuid *logged-in-hash*) login)
 
       uuid)))

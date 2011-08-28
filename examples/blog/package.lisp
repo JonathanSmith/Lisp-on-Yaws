@@ -5,6 +5,8 @@
   (ql:quickload "cl-markdown")
   (ql:quickload "uuid")
   (ql:quickload "cl-json")
+  (ql:quickload "cl-sendmail")
+  (ql:quickload "cl-redis")
   (asdf:operate 'asdf:load-op :lisp-on-yaws))
 
 (defpackage blog
