@@ -3,8 +3,8 @@
 (defparameter *posts-directory* 
   (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 
-(setf *yaws-server-node-name* "jon-VirtualBox")
-(setf *cookie-file* "/home/jon/Lisp-On-Yaws/COOKIE")
+(setf *yaws-server-node-name* "jon-Desktop")
+(setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
 (defun timestamp ()
   (multiple-value-bind (second minute hour date month year)  
@@ -43,9 +43,8 @@
   (let ((predicated (concatenate 'string ns ":" key)))
     (if secs
 	(redis:with-connection ()
-	  (redis:with-pipelining
 	    (redis:red-set predicated val)
-	    (redis:red-expire predicated secs)))
+	    (redis:red-expire predicated secs))
 	(redis:with-connection ()
 	  (redis:red-set predicated val)))))
 
@@ -142,6 +141,7 @@
     `($.get ,link
 	    (ps:create)
 	    (lambda (,data)
+	      (console.log ,data)
 	      (ps:chain ($ ,div-id) 
 			(html ,data))
 	      ,@(if afterfn
@@ -179,96 +179,73 @@
      (:html (:head (:title "Jon Feed")
 		   (:link :rel "stylesheet" :href "/blog.css"))
 	    (:body 
-	     (:div :id "index")	     
-	     (:div :id "middle"
-		   (:div  :id "notify" "Notifications Go Here")
+	     (:div :id "header" :class "header"
+		   (:div  :id "notify" :class "notify" "Notifications Go Here")
 		   (:h1 "JonFeed")
-		   (:h4 "For all your Jon News")
-		   (:div  :id "blog")
-		   (:div  :id "footer"
-			 (named-link var "/blog/register/" "div#blog" "Register") :br
-			 (named-link var "/blog/post/" "div#blog" "Add A Post") :br
-			 (named-link var "/blog/chat/" "div#chat" "Chat") :br
-			 (named-link var "/blog/login/" "div#blog" "Login")))
-	     (:div :id "chat"  "Chat Goes Here")
+		   (:h4 "For all your Jon News"))
+
+	     (:div :id "index" :class "index")
+	     
+	     (:div :id "chat" :class "chat")
+	     
+	     (:div  :id "blog" :class "blog")
+
+	     (:div  :id "footer" :class "footer"
+		    (named-link var "/blog/register/" "div#blog" "Register")
+		    (named-link var "/blog/post/" "div#blog" "Add A Post")
+		    (named-link var "/blog/chat/" "div#chat" "Chat")
+		    (named-link var "/blog/login/" "div#blog" "Login"))
+
+	     
+	     
 
 	     (:script :src "/jquery.min.js")
 	     (let ((link (format nil "/posts/~a_~a.html" author (most-recent-post author))))
 	       (cl-who:htm
 		(:script :type "text/javascript"
 			 (cl-who:str 
-			  (ps:ps* `(defun get-init-post (afterfn)
-				     (js-link ,link "div#blog" afterfn))
-				  `(defun init-login (afterfn)
+			  (ps:ps* `(defun get-init-post ()
+				     (js-link ,link "div#blog"))
+				  `(defun init-login ()
 				     (let ((session-id (get-cookie ,*site-cookie-name*)))
-				       (if session-id
-					   ($.post "/blog/re-auth/" (ps:create :session-id session-id)
-						   (lambda (data textstatus qxhr)
-						     (if (equal (ps:getprop data 'status) "success")
-							 (progn
-							   (ps:chain ($ "input#session-id") (val session-id))
-							   (ps:chain ($ "div#notify") 
-								     (html 
-								      (concatenate 'string "Logged In As "
-										   (ps:getprop data 'author))))
-							   (js-link "/blog/chat/" "div#chat" afterfn))
-							 (progn (alert "failure")
-								(afterfn)))))
-					   (afterfn))))
-				  
-				  #|(defvar signals (ps:create))
+				       ($.post "/blog/re-auth/" (ps:create :session-id session-id)
+					       (lambda (data textstatus qxhr)
+						 (when (equal (ps:getprop data 'status) "success")
+						   (ps:chain ($ "input#session-id") (val session-id))
+						   (ps:chain ($ "div#notify") 
+							     (html 
+							      (concatenate 'string "Logged In As "
+									   (ps:getprop data 'author))))
+						   (js-link "/blog/chat/" "div#chat" chat-loop-init))))))
 
-				  (defun ready-wait-loop (connection-token)
-				    ($.get "/blog/signals"
-					   (ps:create :token connection-token)
-					   (lambda (data)
-					     (signal (first data) (rest data))
-					     (ready-wait-loop))))|#
-			
-
-				  `(defun check-last-post (afterfn)
-				     ($.get ,(format nil "/blog/last_post/~a" author)  
+				  `(defun update-index ()
+				     ($.get ,(format nil "/posts/~a_index.html" author)
 					    (ps:create)
-					    (lambda (server-id)
-					      (let ((this-id (ps:chain ($ "input#latest") (val))))
-						(if (not (equal this-id server-id))
-						    ($.get ,(format nil "/posts/~a_index.html" author)
-							   (ps:create)
-							   (lambda (data)
-							     (ps:chain 
-							      ($ "div#index")
-							      (html data))
-							     (afterfn)))
-						    (afterfn))))
-					    "json"
-					    ))
-				  `(defun check-last-post-sub ()
+					    (lambda (data)
+					      (ps:chain 
+					       ($ "div#index")
+					       (html data)))))
+
+				  `(defun check-last-post ()
 				     ($.get ,(format nil "/blog/last_post/~a" author)  
 					    (ps:create)
 					    (lambda (server-id)
 					      (let ((this-id (ps:chain ($ "input#latest") (val))))
 						(unless (equal this-id server-id)
-						  ($.get ,(format nil "/posts/~a_index.html" author)
-							 (ps:create)
-							 (lambda (data)
-							   (ps:chain 
-							    ($ "div#index")
-							    (html data)))))))
+						  (update-index)
+						  (ps:chain ($ "input#latest") (val server-id)))))
 					    "json"))))
-			 (cl-who:str 
+
+			 (cl-who:str
 			  (ps:ps 
 			    (ps:chain 
-			     ($ document) 
-			     (ready
-			      (lambda ()
-				(alert "1")
-				(init-login 
-				 (lambda ()
-				   (alert "2")
-				   (get-init-post 
+				   ($ document) 
+				   (ready
 				    (lambda ()
-				      (alert "3")
-				      (check-last-post poll-index))))))))
+				      (init-login)
+				      (get-init-post)		  
+				      (update-index)
+				      (poll-index))))
 
 			    (defun set-cookie (c-name value exdays)
 			      (let ((exdate (ps:new (-date))))
@@ -299,11 +276,9 @@
 				    (setf r (ps:chain x (replace (ps:regex "/^\s|\s|$/g") "")))))))
 				
 			    (defun poll-index ()
-			      ;(ps:var timer (set-interval "checkLastPostSub()" 30000))
-			      ))))))
-
-
-	     (:input :type "hidden" :id "session-id" :name "session-id"))))))
+			      (ps:var timer (set-interval "checkLastPost()" 30000))
+			      ))))
+	     (:input :type "hidden" :id "session-id" :name "session-id"))))))))
 
 (defhandler (blog get ("post")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -327,7 +302,7 @@
 									author  "_" most-recent-post ".html"))
 					       (indexes-link (concatenate 'string "/posts/" author "_index.html")))
 					  (js-link posts-link "div#blog")
-					  (js-link "/blog/chat/" "div#chat")
+					  (js-link "/blog/chat/" "div#chat" chat-loop-init)
 					  (js-link indexes-link "div#index")
 					  (ps:chain ($ "div#notify") 
 						    (html (concatenate 'string "Post Success!"))))
@@ -364,10 +339,10 @@
 	    (generate-index author)
 	    (reply (json:encode-json-to-string (list (cons "author" author)
 						     (cons "postId" (most-recent-post author))
-						     (cons "notify" "success"))))
+						     (cons "notify" "success")))))
 	    (reply (json:encode-json-to-string (list (cons "author" "")
 						     (cons "postId" "")
-						     (cons "notify" "failure")))))))))
+						     (cons "notify" "failure"))))))))
 
 (defhandler (blog get ("register")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -435,7 +410,7 @@
 		       (set-cookie cookie-id session-id expires)
 		       (ps:chain ($ "div#notify") (html (concatenate 'string "Logged In As " author)))
 		       (js-link post-link "div#blog")
-		       (js-link "/blog/chat/" "div#chat"))))))))
+		       (js-link "/blog/chat/" "div#chat" chat-loop-init))))))))
 	    "Login Name"
 	    :br
 	    (:input :type "text" :id "author" :name "author") :br
@@ -484,10 +459,11 @@
   (let ((q (parse-query *query*)))
     (let ((session-id (second (assoc "session-id" q :test #'string=))))
       (let ((logged-in? (check-login session-id)))
+	(if logged-in?
 	    (reply (json:encode-json-to-string (list (cons "author" logged-in?)
 						     (cons "status" "success"))))
 	    (reply (json:encode-json-to-string (list (cons "author" "")
-						     (cons "status" "failure"))))))))
+						     (cons "status" "failure")))))))))
 
 (let ((chat-mutex (sb-thread:make-mutex))
       (chat-position 0)
@@ -572,12 +548,7 @@
 				   (ps:chain 
 				    ($ "input#session-id")
 				    (val))))
-				 (ps:chain ($ "input#message") (val "")))
-			      
-			       (ps:chain 
-				($ document) 
-				(ready
-				 (chat-loop-init))))))
+				 (ps:chain ($ "input#message") (val ""))))))
 		   (:div :id "chatwindow")
 		   :br
 		   "Message: "

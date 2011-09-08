@@ -1,6 +1,7 @@
 (in-package :asdf)
 (defsystem :lisp-on-yaws
     :name "lisp-on-yaws"
+    :depends-on (:cleric :thread-pool)
     :version "0.0.1"
     :components ((:module
 		  "src"

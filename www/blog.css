@@ -1,12 +1,11 @@
 body {
-  padding-left: 11em;
   font-family: Georgia, "Times New Roman",
         Times, serif;}
 ul.navbar {
   list-style-type: none;
   padding: 0;
   margin: 0;
-  position: fixed;
+  position: inherit;
   top: 2em;
   left: 1em;
   width: 9em }
@@ -14,40 +13,80 @@ h1 {
   color: red;
   font-family: Helvetica, Geneva, Arial,
         SunSans-Regular, sans-serif }
+
 ul.navbar li {
   background: white;
   margin: 0.5em 0;
   padding: 0.3em;
-  border-right: 1em solid black }
+  border-right: 0.3em solid black }
 ul.navbar a {
   text-decoration: none }
 a:link {
   color: blue }
 a:visited {
   color: purple }
+
 address {
   margin-top: 1em;
   padding-top: 1em;
   border-top: thin dotted }
+
+div.index {
+height: 100%;
+width: 20%;
+margin: 8px 8px;
+margin-left: 0%;
+padding: 10px;
+border: 1px solid #6699FF;
+background-color: #BBD2FF;
+font-size: 90%;
+float: left;
+}
+
 div.chat {
-padding: 0;
-margin: 0;
-position: fixed;
-top: 2em;
-left: 23em;
-width: 11em;
+height: 100%;
+width: 30%;
+margin: 8px 8px;
+margin-left: 35%;
+padding: 10px;
+border: 1px solid #6699FF;
+background-color: #BBD2FF;
+font-size: 90%;
+float: right;
+}
+div.header {
+width: 97%;
+margin: 8px 8px;
+margin-left: 0%;
+padding: 10px;
+border: 1px solid #6699FF;
+background-color: #BBD2FF;
+font-size: 90%;
+float: center;
+clear: both;
 }
 div.notify {
-position:relative;
 }
 div.blog{
-position:relative;
+height: 100%;
+width: 42%;
+margin: 8px 8px;
+margin-left: 23%;
+padding: 10px;
+border: 1px solid #6699FF;
+background-color: #BBD2FF;
+font-size: 90%;
+float: center;
 }
 div.footer{
-position:relative;
-div.middle {
-padding: 0;
-margin: 0;
-position: fixed;
-top: 2em;
+width: 97%;
+margin: 8px 8px;
+margin-left: 0%;
+padding: 10px;
+border: 1px solid #6699FF;
+background-color: #BBD2FF;
+font-size: 90%;
+float: center;
+clear: both;
 }
+
