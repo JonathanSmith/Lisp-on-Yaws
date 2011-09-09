@@ -32,44 +32,75 @@ address {
   border-top: thin dotted }
 
 div.index {
-height: 100%;
+height: 73%;
 width: 20%;
 margin: 8px 8px;
+top: 22%;
 margin-left: 0%;
 padding: 10px;
 border: 1px solid #6699FF;
 background-color: #BBD2FF;
 font-size: 90%;
 float: left;
+position: absolute;
 }
 
 div.chat {
-height: 100%;
+height: 73%;
 width: 30%;
+top: 22%;
 margin: 8px 8px;
-margin-left: 35%;
+margin-left: 70%;
 padding: 10px;
 border: 1px solid #6699FF;
 background-color: #BBD2FF;
 font-size: 90%;
 float: right;
+position: absolute;
+
 }
+div.login {
+background-color: #BBBBBB;
+    border: 1px solid #888888;
+    float: right;
+    height: 70%;
+    margin: 8px 1% 8px 8px;
+    margin-left: 78%;
+    position: absolute;
+    top: 0;
+    width: 20%;
+}
+
 div.header {
-width: 97%;
+width: 100%;
+height: 20%;
+margin-top 0%;
 margin: 8px 8px;
 margin-left: 0%;
-padding: 10px;
 border: 1px solid #6699FF;
 background-color: #BBD2FF;
 font-size: 90%;
 float: center;
+position: absolute;
 clear: both;
 }
+
 div.notify {
+background-color: #BBBBBB;
+border: 1px solid #888888;
+float: center;
+height: 15%;
+margin: 8px 1% 8px 8px;
+margin-left: 23%;
+position: absolute;
+top: 0;
+width: 42%;
+clear: none;
 }
 div.blog{
-height: 100%;
+height: 65%;
 width: 42%;
+top:22%;
 margin: 8px 8px;
 margin-left: 23%;
 padding: 10px;
@@ -77,16 +108,19 @@ border: 1px solid #6699FF;
 background-color: #BBD2FF;
 font-size: 90%;
 float: center;
+position: absolute;
 }
 div.footer{
-width: 97%;
+width: 42%;
+height: 5%;
 margin: 8px 8px;
-margin-left: 0%;
+margin-left: 23%;
+bottom: 0%;
 padding: 10px;
 border: 1px solid #6699FF;
 background-color: #BBD2FF;
 font-size: 90%;
 float: center;
-clear: both;
+position: absolute;
 }
 
