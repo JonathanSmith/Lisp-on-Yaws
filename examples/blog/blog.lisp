@@ -3,7 +3,7 @@
 (defparameter *posts-directory* 
   (pathname (concatenate 'string (directory-namestring (truename ".")) "/posts/*.pst")))
 
-(setf *yaws-server-node-name* "jon-Desktop")
+(setf *yaws-server-node-name* "jon-VirtualBox")
 (setf *cookie-file* "/home/jon/Dropbox/Lisp-on-Yaws/COOKIE")
 
 (defun timestamp ()
@@ -43,15 +43,44 @@
   (let ((predicated (concatenate 'string ns ":" key)))
     (if secs
 	(redis:with-connection ()
-	    (redis:red-set predicated val)
-	    (redis:red-expire predicated secs))
+	  (first (redis:with-pipelining 
+		   (redis:red-set predicated val)
+		   (redis:red-expire predicated secs))))
 	(redis:with-connection ()
 	  (redis:red-set predicated val)))))
+
+(defun getprop (list indicator &optional (default nil))
+  (do* ((key (car list) (car rest))
+	(val (cadr list) (cadr rest))
+	(rest (cddr list) (cddr rest)))
+       ((or (string-equal key indicator) (null key)) (or val default))))
 
 (defun getredis (key ns)
   (let ((predicated (concatenate 'string ns ":" key)))
     (redis:with-connection ()
       (redis:red-get predicated))))
+
+(defun hgetredis (key field ns)
+  (let ((predicated (concatenate 'string ns ":" key)))
+    (redis:with-connection ()
+      (redis:red-hget predicated field))))
+
+(defun hsetredis (key field value ns)
+  (let ((predicated (concatenate 'string ns ":" key)))
+    (redis:with-connection ()
+      (redis:red-hset predicated field value))))
+
+(defun hmgetredis (key ns)
+  (let ((predicated (concatenate 'string ns ":" key)))
+    (redis:with-connection ()
+      (redis:red-hgetall predicated))))
+
+(defun hmsetredis (key ns &rest vals)
+  (let ((predicated (concatenate 'string ns ":" key)))
+    (redis:with-connection ()
+      (apply #'redis:red-hmset predicated vals))))
+
+
 
 (defun lpushredis (key ns val)
   (let ((predicated (concatenate 'string ns ":" key)))
@@ -106,15 +135,19 @@
 	     (:ul :class "navbar"
 		  (loop for time in post-times
 		     do 
-		     (let ((link (format nil "/posts/~a_~a.html" author time)))
-		       (cl-who:htm 
-			(:li 
-			 (named-link var link "div#blog" (getredis (format nil "~a_~a" author time) *pst-title*)))))))
+		     (let ((link (format nil "/posts/~a_~a.html" author time))) 
+		       (clickable-li var (getredis (format nil "~a_~a" author time) *pst-title*)  link "div#blog" ))))
 	     (:input :type "hidden" :id "latest" :name "latest" :value (most-recent-post author)))))
-      (send-static-page "posts" (format nil "~a_index.html" author)  index-page)
+      (send-static-page "posts" (format nil "~a_index.html" (hgetredis author "display-name" *settings-ns*))  index-page)
       nil)))
 
-(defparameter *salt* "PASSWORD")
+
+(defvar *salt* (let ((salt (redis:with-connection () (redis:red-get "PASSWORD:SALT"))))
+		       (if salt 
+			   salt
+			   (let ((uuid (uuid-string))) 
+			     (redis:with-connection () (redis:red-set "PASSWORD:SALT" uuid))
+			     uuid))))
 
 (defvar *site-cookie-name* (uuid-string)) ;;can go into redis later on.
 
@@ -123,46 +156,42 @@
     (map 'string #'code-char (md5::MD5SUM-SEQUENCE salted))))
 
 (defvar *password-ns* "PW")
+(defvar *settings-ns* "SET")
 
 (defun add-password (name password)
-    (setf (getredis name *password-ns*) (obfuscate-password password)))
+    (setf (getredis (string-downcase name) *password-ns*) (obfuscate-password password)))
 
 (defun check-password (name password)
-  (string= (getredis name *password-ns*) (obfuscate-password password)))
+  (string= (getredis (string-downcase name) *password-ns*) (obfuscate-password password)))
 
-(ps:defpsmacro signalable (function-name)
-  `(setf (ps:getprop signals ,(symbol-name function-name)) function-name))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (ps:defpsmacro js-link (link div-id &optional afterfn object)
+    (let ((data (gensym)))
+      `($.get ,link
+	      ,(if object object `(ps:create))
+	      (lambda (,data)
+		(console.log ,data)
+		(ps:chain ($ ,div-id) 
+			  (html ,data))
+		,@(if afterfn
+		      `((,afterfn))
+		      ())))))
 
-(ps:defpsmacro signal (function-name args)
-  `(apply (ps:getprop signals ,function-name) ,args))
-
-(ps:defpsmacro js-link (link div-id &optional afterfn)
-  (let ((data (gensym)))
-    `($.get ,link
-	    (ps:create)
-	    (lambda (,data)
-	      ;(console.log ,data)
-	      (ps:chain ($ ,div-id) 
-			(html ,data))
-	      ,@(if afterfn
-		    `((,afterfn))
-		    ())))))
-
-(ps:defpsmacro defpostfn (name path 
-			  (args1 &body body1) 
-			  (args2 &body body2))
-  (let ((strings (mapcar #'(lambda (symbol) (string-downcase (symbol-name symbol))) path)))
-    (let ((path-name (reduce (lambda (name1 name2)
-			       (format nil "~a~a/" name1 name2)) 
-			     (cons (format nil "/~a/" (car strings))
-				   (cdr strings))))
-	  (post-result (gensym)))
-      `(defun ,name (,@args1)
-	 (let ((,post-result (progn ,@body1)))
-	   ($.post 
-	    ,path-name
-	    ,post-result
-	    (lambda (,@args2) ,@body2)))))))
+  (ps:defpsmacro defpostfn (name path 
+				 (args1 &body body1) 
+				 (args2 &body body2))
+    (let ((strings (mapcar #'(lambda (symbol) (string-downcase (symbol-name symbol))) path)))
+      (let ((path-name (reduce (lambda (name1 name2)
+				 (format nil "~a~a/" name1 name2)) 
+			       (cons (format nil "/~a/" (car strings))
+				     (cdr strings))))
+	    (post-result (gensym)))
+	`(defun ,name (,@args1)
+	   (let ((,post-result (progn ,@body1)))
+	     ($.post 
+	      ,path-name
+	      ,post-result
+	      (lambda (,@args2) ,@body2))))))))
  
 (defun named-link (stream link div-id name)
   (cl-who:with-html-output (stream)
@@ -170,126 +199,144 @@
 	(ps:ps-inline* `(js-link ,link ,div-id))
 	(cl-who:str name))))
 
+(defun clickable-li (stream name &rest rest)
+  (cl-who:with-html-output (stream)
+    (:li :onclick (ps:ps-inline* `(js-link ,@rest))
+	 (cl-who:str name))))
+
 (defhandler (blog get ("last_post" author)) (:|content| "application/json")
     (reply (most-recent-post author)))
 
 (defhandler (blog get ("main" author)) (:|html|)
-  (reply 
-   (cl-who:with-html-output-to-string (var)
-     (:html (:head (:title "Jon Feed")
-		   (:link :rel "stylesheet" :href "/blog.css"))
-	    (:body 
-	     (:div :id "header" :class "header"
-		   (:div  :id "notify" :class "notify")
-		   (:div :id "login" :class "login")
-		   (:h1 "JonFeed")
-		   (:h4 "For all your Jon News"))
+  (setf author (string-downcase author))
+  (let ((properties (hmgetredis author *settings-ns*)))
+    (reply 
+     (cl-who:with-html-output-to-string (var)
+       (:html (:head (:title (cl-who:str (getprop properties "title")))
+		     (:link :rel "stylesheet" :href "/blog.css"))
+	      (:body 
+	       (:div :id "header" :class "header"
+		     (:div  :id "notify" :class "notify")
+		     (:div :id "login" :class "login")
+		     (:h1 (cl-who:str (getprop properties "title")))
+		     (:h4 (cl-who:str (getprop properties "subtitle"))))
 
-	     (:div :id "index" :class "index")
-	     (:div :id "chat" :class "chat")
-	     (:div  :id "blog" :class "blog")	     
-	     
+	       (:div :id "index" :class "index")
+	       (:div :id "chat" :class "chat")
+	       (:div  :id "blog" :class "blog")	     
+	  
+	       (:div  :id "menu" :class "menu"
+		      (:ul
+		       (clickable-li var "Add A Post" "/blog/post/new" "div#blog")
+		       (clickable-li var
+				     "Settings"
+				     "/blog/settings"
+				     "div#blog" 
+				     '(lambda ())
+				     '(ps:create :session-id (ps:chain ($ "input#session-id") (val))))
+		       (clickable-li var "Edit a Post" "/blog/post/edit" "div#blog")))
 
-	     (:div  :id "footer" :class "footer"	    
-		    (named-link var "/blog/post/" "div#blog" "Add A Post"))
+	       (:script :src "/jquery.min.js")
+	       (let ((link (format nil "/posts/~a_~a.html" author (most-recent-post author))))
+		 (cl-who:htm
+		  (:script :type "text/javascript"
+			   (cl-who:str 
+			    (ps:ps* 
+			     `(defvar author ,author)
+			     `(defun get-init-post ()
+				(js-link ,link "div#blog"))
+			     `(defun init-login ()
+				(let ((session-id (get-cookie ,*site-cookie-name*)))
+				  ($.post "/blog/re-auth/" (ps:create :session-id session-id)
+					  (lambda (data textstatus qxhr)
+					    (if (equal (ps:getprop data 'status) "success")
+						(progn
+						  (ps:chain ($ "input#session-id") (val session-id))
+						  (ps:chain ($ "div#login") 
+							    (html 
+							     (logged-in-message (ps:getprop data 'user))))
+						  (js-link "/blog/chat/" "div#chat" chat-loop-init))
+						(js-link "/blog/login/" "div#login"))))))
+			     `(defun log-out ()
+				(set-cookie ,*site-cookie-name* "" 0)
+				(ps:chain ($ "div#chat") (html ""))
+				(init-login))
 
-	     
-	     
+			     `(defun update-index ()
+				($.get ,(format nil "/posts/~a_index.html" author)
+				       (ps:create)
+				       (lambda (data)
+					 (ps:chain 
+					  ($ "div#index")
+					  (html data)))))
 
-	     (:script :src "/jquery.min.js")
-	     (let ((link (format nil "/posts/~a_~a.html" author (most-recent-post author))))
-	       (cl-who:htm
-		(:script :type "text/javascript"
-			 (cl-who:str 
-			  (ps:ps* 
-			   `(defvar author ,author)
-			   `(defun get-init-post ()
-				     (js-link ,link "div#blog"))
-				  `(defun init-login ()
-				     (let ((session-id (get-cookie ,*site-cookie-name*)))
-				       ($.post "/blog/re-auth/" (ps:create :session-id session-id)
-					       (lambda (data textstatus qxhr)
-						 (if (equal (ps:getprop data 'status) "success")
-						     (progn
-						       (ps:chain ($ "input#session-id") (val session-id))
-						       (ps:chain ($ "div#login") 
-								 (html 
-								  (logged-in-message (ps:getprop data 'user))))
-						       (js-link "/blog/chat/" "div#chat" chat-loop-init))
-						     (js-link "/blog/login/" "div#login"))))))
+			     `(defun check-last-post ()
+				($.get ,(format nil "/blog/last_post/~a" author)  
+				       (ps:create)
+				       (lambda (server-id)
+					 (let ((this-id (ps:chain ($ "input#latest") (val))))
+					   (unless (equal this-id server-id)
+					     (update-index)
+					     (ps:chain ($ "input#latest") (val server-id)))))
+				       "json"))))
 
-				  `(defun update-index ()
-				     ($.get ,(format nil "/posts/~a_index.html" author)
-					    (ps:create)
-					    (lambda (data)
-					      (ps:chain 
-					       ($ "div#index")
-					       (html data)))))
+			   (cl-who:str
+			    (ps:ps 
+			      (ps:chain 
+			       ($ document) 
+			       (ready
+				(lambda ()
+				  (init-login)
+				  (get-init-post)		  
+				  (update-index)
+				  (poll-index))))
 
-				  `(defun check-last-post ()
-				     ($.get ,(format nil "/blog/last_post/~a" author)  
-					    (ps:create)
-					    (lambda (server-id)
-					      (let ((this-id (ps:chain ($ "input#latest") (val))))
-						(unless (equal this-id server-id)
-						  (update-index)
-						  (ps:chain ($ "input#latest") (val server-id)))))
-					    "json"))))
+			      (defun logged-in-message (user)
+				(let ((a (concatenate 'string  "Logged In As " user))
+				      (b (ps:lisp (cl-who:with-html-output-to-string (s) 
+						    :br
+						    (:a :href "#" :onclick (ps:ps-inline (log-out)) "Log Out")
+						    ))))
+					;(console.log a)
+					;(console.log b)
+				  (concatenate 'string a b)))
+			      (defun set-cookie (c-name value exdays)
+				(let ((exdate (ps:new (-date))))
+				  (ps:chain exdate (set-date (+ (ps:chain exdate (get-Date)) exdays)))
+				  (let ((c-val (concatenate 
+						'string
+						(escape value)
+						(if (not exdays)
+						    ""
+						    (concatenate 
+						     'string
+						     #.(format nil ";~%expires=")
+						     (ps:chain exdate (to-u-t-c-string)))))))
+				    (setf (ps:chain document cookie)
+					  (concatenate 'string c-name "=" c-val)))))
 
-			 (cl-who:str
-			  (ps:ps 
-			    (ps:chain 
-				   ($ document) 
-				   (ready
-				    (lambda ()
-				      (init-login)
-				      (get-init-post)		  
-				      (update-index)
-				      (poll-index))))
-			    (defun logged-in-message (user)
-			      (let ((a (concatenate 'string  "Logged In As " user))
-				    (b (ps:lisp (cl-who:with-html-output-to-string (s) :br (named-link s "/blog/login" "div#login" "Log In As Someone Else")))))
-				;(console.log a)
-				;(console.log b)
-				(concatenate 'string a b)))
-			    (defun set-cookie (c-name value exdays)
-			      (let ((exdate (ps:new (-date))))
-				(ps:chain exdate (set-date (+ (ps:chain exdate (get-Date)) exdays)))
-				(let ((c-val (concatenate 
-					      'string
-					      (escape value)
-					      (if (not exdays)
-						  ""
-						  (concatenate 
-						   'string
-						   #.(format nil ";~%expires=")
-						   (ps:chain exdate (to-u-t-c-string)))))))
-				  (setf (ps:chain document cookie)
-					(concatenate 'string
-						     c-name "=" c-val)))))
-
-			    (defun get-cookie (cname)
-			      (let ((arr-cookies  (ps:chain document cookie (split ";"))))
-				(let (eqlidx x y r) 
-				  (do* ((i 0 (+ i 1))
-					(current (ps:getprop arr-cookies i) (ps:getprop arr-cookies i)))
-				       ((or (equal r cname) (>= i (ps:chain arr-cookies length)))
-					(if (equal r cname)  y  y))
-				    (setf eqlidx (ps:chain current (index-of "=")))
-				    (setf x (ps:chain current (substr 0 eqlidx)))
-				    (setf y  (ps:chain current (substr (+ eqlidx 1))))
-				    (setf r (ps:chain x (replace (ps:regex "/^\s|\s|$/g") "")))))))
+			      (defun get-cookie (cname)
+				(let ((arr-cookies  (ps:chain document cookie (split ";"))))
+				  (let (eqlidx x y r) 
+				    (do* ((i 0 (+ i 1))
+					  (current (ps:getprop arr-cookies i) (ps:getprop arr-cookies i)))
+					 ((or (equal r cname) (>= i (ps:chain arr-cookies length)))
+					  (if (equal r cname)  y  y))
+				      (setf eqlidx (ps:chain current (index-of "=")))
+				      (setf x (ps:chain current (substr 0 eqlidx)))
+				      (setf y  (ps:chain current (substr (+ eqlidx 1))))
+				      (setf r (ps:chain x (replace (ps:regex "/^\s|\s|$/g") "")))))))
 				
-			    (defun poll-index ()
-			      (ps:var timer (set-interval "checkLastPost()" 30000))))))
-	     (:input :type "hidden" :id "session-id" :name "session-id"))))))))
+			      (defun poll-index ()
+				(ps:var timer (set-interval "checkLastPost()" 30000))))))
+		  (:input :type "hidden" :id "session-id" :name "session-id")))))))))
 
-(defhandler (blog get ("post")) (:|html|)
+(defhandler (blog get ("post" "new")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
 	   (:html (:body
 		   (:script :type "text/javascript"
 			    (cl-who:str
-			     (ps:ps (defpostfn make-post (blog post)
+			     (ps:ps (defpostfn make-post (blog post new)
 				      ((session-id title text)
 				       (ps:create "session-id" session-id
 						  "title" title
@@ -329,14 +376,14 @@
 				       (ps:chain ($ "textarea#post-text")
 						 (val))))))))))
 
-(defhandler (blog post ("post")) (:|content| "application/json")
+(defhandler (blog post ("post" "new")) (:|content| "application/json")
   (let* ((q (parse-query *query*))
 	 (session-id (second (assoc "session-id" q :test #'string=)))
 	 (title (second (assoc "title" q :test #'string=)))
 	 (post (second (assoc "post" q :test #'string=))))
     (let ((user (check-login session-id)))
       (if (and user title post)	
-	  (let ((pst-id (generate-post-pst-file title user post)))
+	  (let ((pst-id (generate-post-pst-file title (hgetredis user "display-name" *settings-ns*) post)))
 	    (generate-post-from-file pst-id)
 	    (generate-index user)
 	    (reply (json:encode-json-to-string (list (cons "user" user)
@@ -345,6 +392,76 @@
 	    (reply (json:encode-json-to-string (list (cons "user" "")
 						     (cons "postId" "")
 						     (cons "notify" "failure"))))))))
+
+(defhandler (blog get ("post" "edit")) (:|html|)
+  (reply (cl-who:with-html-output-to-string (var))))
+
+(defhandler (blog post ("post" "edit")) (:|content| "application/json"))
+
+
+
+(defhandler (blog get ("settings")) (:|html|)
+  (let* ((q (parse-query *query*))
+	 (session-id (second (assoc "session-id" q :test #'string=))))
+    (let ((user (check-login session-id)))
+      (if user
+	  (let* ((settings (hmgetredis user *settings-ns*)))
+	    (let ((title (getprop settings "title" "Title"))
+		  (display-name (getprop settings "display-name" user))
+		  (subtitle (getprop settings "subtitle" "Subtitle")))
+
+	      (reply (cl-who:with-html-output-to-string (var)
+		       (:body
+			(:script :type "text/javascript"
+				 (cl-who:str 
+				  (ps:ps (defpostfn update-settings (blog settings)
+					   ((object) object)
+					   ((data texstatus qxhr)
+					    (let ((status (ps:getprop data 'status)))
+					      (if (eql status "success")
+						  (ps:chain ($ "div#notify") (html "Settings Updated"))
+						  (ps:chain ($ "div#notify") (html "Settings Not Upated")))))))))
+
+			"Display Name" :br
+			(:input :type "text" :id "display-name" :name "display-name" :value display-name) :br
+			"Title" :br
+			(:input :type "text" :id "title" :name "title" :value title) :br
+			"Subtitle" :br
+			(:input :type "text" :id "subtitle" :name "subtitle" :value subtitle) :br
+			(:input 
+			 :type "submit"
+			 :name "submit"
+			 :onclick (cl-who:str (ps:ps-inline (update-settings
+							     (ps:create 
+							      :session-id 
+							      (ps:chain ($ "input#session-id")
+									(val))
+							      :display-name 
+							      (ps:chain ($ "input#display-name")
+									(val))
+							      :title
+							      (ps:chain ($ "input#title")
+									(val))
+							      :subtitle
+							      (ps:chain ($ "input#subtitle")
+									(val)))
+							     )))
+			 :value "Update Settings"))))))
+	  (reply "Log In First"))
+      )))
+
+(defhandler (blog post ("settings")) (:|content| "application/json")
+  (let* ((q (parse-query *query*))
+	 (session-id (second (assoc "session-id" q :test #'string=))))
+    (format t "~s~%" q)
+    (let ((user (check-login session-id)))
+      (if user
+	  (let ((title (cl-who:escape-string-iso-8859-1(second (assoc "title" q :test #'string=))))
+		(subtitle (cl-who:escape-string-iso-8859-1 (second (assoc "subtitle" q :test #'string=))))
+		(display-name (cl-who:escape-string-iso-8859-1 (second (assoc "display-name" q :test #'string=)))))
+	    (hmsetredis user *settings-ns* "title" title "subtitle" subtitle "display-name" display-name)
+	    (reply (json:encode-json-to-string (list (cons "status" "success")))))
+	  (reply (json:encode-json-to-string (list (cons "status" "failure"))))))))
 
 (defhandler (blog get ("register")) (:|html|)
   (reply (cl-who:with-html-output-to-string (var)
@@ -374,7 +491,7 @@
 (defhandler (blog post ("register")) (:|html|)
   (let*  ((q (parse-query *query*))
 	  (auth-code (second (assoc "auth" q :test #'string=)))
-	  (user (second (assoc "user" q :test #'string=)))
+	  (user (string-downcase (cl-who:escape-string-iso-8859-1 (second (assoc "user" q :test #'string=)))))
 	  (password (second (assoc "password" q :test #'string=)))
 	  (password2 (second (assoc "password2" q :test #'string=)))
 	  (auth-code-valid (and auth-code (string= auth-code *auth-code*))))
@@ -386,7 +503,8 @@
 			      :br (:b (:a :href "/blog/register" "Try Again")))))))
       ((and (string= password password2) auth-code-valid)
        (add-password user password)
-       (reply "/blog" :|redirect|))
+       (hmsetredis user *settings-ns* "title" "Your Title Here" "subtitle" "Go To Settings to Change Title" "display-name" user)
+       (reply (format nil "/blog/main/~a" user) :|redirect|))
       (T (reply (cl-who:with-html-output-to-string (var)
 		  (:html (:body (:B "Passwords do not match")
 				:br (:b (:a :href "/blog/register" "Try Again"))))))))))
@@ -398,7 +516,6 @@
 	     :type "text/javascript" 
 	     (cl-who:str
 	      (ps:ps
-		
 		(defpostfn login (blog login)
 		  ((user password) 
 		   (ps:create "user" user "password" password))
@@ -406,11 +523,10 @@
 		   (let ((expires (ps:getprop data 'expires))
 			 (cookie-id (ps:getprop data 'cookie-id))
 			 (session-id (ps:getprop data 'session-id))
-			 (user (ps:getprop data 'user)))
-		     
+			 (user2 (ps:getprop data 'user)))
 		       (ps:chain ($ "input#session-id") (val session-id))
 		       (set-cookie cookie-id session-id expires)
-		       (let ((b (logged-in-message user)))
+		       (let ((b (logged-in-message user2)))
 			 (console.log b)
 		       (ps:chain ($ "div#login") (html b)))
 		       (js-link "/blog/chat/" "div#chat" chat-loop-init)))))))
@@ -440,7 +556,7 @@
 (defun create-login (user password)
   (when (check-password user password)
     (let* ((uuid (uuid-string)))
-      (setf (getredis uuid *login-cookie-ns* *login-timeout*) user)
+      (setf (getredis uuid *login-cookie-ns* *login-timeout*) (string-downcase user))
       uuid)))
 
 (defun check-login (uuid)
@@ -450,7 +566,7 @@
 
 (defhandler (blog post ("login")) (:|content| "application/json")
   (let ((q (parse-query *query*)))
-    (let ((user (second (assoc "user" q  :test #'string=)))
+    (let ((user (string-downcase (cl-who:escape-string-iso-8859-1 (second (assoc "user" q  :test #'string=)))))
 	  (password (second (assoc "password" q :test #'string=))))
       (let ((uuid (create-login user password)))
 	(if uuid 
@@ -459,7 +575,7 @@
 						(cons "cookieId" *site-cookie-name*)
 						(cons "postId" (most-recent-post user))
 						(cons "sessionId" uuid)
-						(cons "user" user))))
+						(cons "user" (hgetredis user "display-name" *settings-ns*)))))
 	    (reply "error"))))))
 
 (defhandler (blog post ("re-auth")) (:|content| "application/json")
@@ -473,15 +589,15 @@
 						     (cons "status" "failure")))))))))
 
 
-(let ((chat-ns "chat")
-      (chat-reply-table (make-hash-table :test  #'equalp :synchronized t)))
+(defvar *chat-ns* "chat")
+(let ((chat-reply-table (make-hash-table :test  #'equalp :synchronized t)))
 
   (defun get-chat-text (user &optional (chat-length 20))
-    (let ((text-list (lrangeredis user chat-ns 0 chat-length)))
+    (let ((text-list (lrangeredis user *chat-ns* 0 chat-length)))
       (apply #'concatenate 'string (nreverse text-list))))
 
   (defun set-chat-text (user string)
-    (lpushredis user chat-ns string)
+    (lpushredis user *chat-ns* string)
     (reply-chat user))
 
   (defun queue-request (user) 
@@ -519,6 +635,18 @@
 					  (ps:chain ($ "div#chatwindow") 
 						    (html data))
 					  (chat-loop))))
+			       
+			       (defun chat-history (start end)
+				 ($.get (concatenate 'string "/blog/chat/history/" author)
+					(ps:create :session-id (ps:chain ($ "input#session-id") (val))
+						   :start start
+						   :end end)
+					(lambda (data)
+					  (let ((status (ps:getprop data 'status)))
+					    (if (eql status "success")
+						(let ((result (ps:getprop data 'result)))
+						  (ps:chain ($ "div#blog")
+							    (html result))))))))
 
 			       (defun key-stroke-update (event)
 				 (if (or (= (ps:chain event char-code) 13)
@@ -538,6 +666,7 @@
 				    ($ "input#session-id")
 				    (val))))
 				 (ps:chain ($ "input#message") (val ""))))))
+		   (:a :href "#" :onclick (ps:ps-inline (chat-history 0 20)) "history")
 		   (:div :id "chatwindow")
 		   :br
 		   "Message: "
@@ -564,6 +693,29 @@
     (when (check-login session-id)
       (reply (get-chat-text author)))))
 
+(defhandler (blog get ("chat" "history" author)) (:|content| "application/json")
+  (let* ((q (parse-query *query*))
+	 (session-id (second (assoc "session-id" q :test #'string=)))
+	 (start (parse-integer (second (assoc "start" q :test #'string=)) :junk-allowed t))
+	 (end (parse-integer (second (assoc "end" q :test #'string=)) :junk-allowed t)))
+    (if (and (check-login session-id) start end)
+	(reply (json:encode-json-to-string 
+		(list (cons "status" "success")
+		      (cons "result"
+			    (cl-who:with-html-output-to-string (var)
+			      (when (>= start 20) 
+				(cl-who:htm (:a :href "#" :onclick (ps:ps-inline* `(chat-history 
+										    ,(- start 20)
+										    ,(- end 20))) "Newer")
+					    (cl-who:str " ")))
+			      (cl-who:htm (:a :href "#" :onclick (ps:ps-inline* `(chat-history
+										  ,(+ start 20)
+										  ,(+ end 20))) "Older") :br)
+
+			      (cl-who:str (apply #'concatenate 'string (nreverse (lrangeredis author *chat-ns* start end)))))))))
+	(reply (json:encode-json-to-string (list (cons "status" "failure")))))))
+			      
+
 (defhandler (blog post ("chat" "p" author)) (:|html|)
   (reply "")
   (let* ((q (parse-query *query*))
@@ -571,10 +723,13 @@
 	 (message (second (assoc "message" q :test #'string=))))
     (let ((name (check-login session-id)))
       (when (and name message)
-	(set-chat-text author (cl-who:conc
-			       (cl-who:escape-string-iso-8859-1 
-				(format nil "~a ~a: ~a" (timestamp) name message))
-			       "<br></br>"))))))
+	(set-chat-text author (cl-who:with-html-output-to-string (str)
+				(cl-who:str (timestamp)) " " 
+				(:a :href (format nil "/blog/main/~a" name) 
+				    (cl-who:str (format nil "~a:" (hgetredis name "display-name" *settings-ns*))))
+				" "
+				(cl-who:str (cl-who:escape-string-iso-8859-1  message))
+				:br))))))
 
 (defun blog-main ()
   (init-server-connection)
