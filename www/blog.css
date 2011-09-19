@@ -29,7 +29,8 @@ ul.navbar li:hover {
  margin: 0.5em 0;
  padding: 0.3em;
  border-right: 0.3em solid red; 
- color: red; }
+ color: red; 
+ cursor: hand;}
 
 ul.navbar a {
   text-decoration: none; }
@@ -101,7 +102,7 @@ height: 15%;
 margin: 8px 1% 8px 8px;
 margin-left: 23%;
 position: absolute;
-top: 0;
+top: 9em;
 width: 42%;
 clear: none; }
 
@@ -149,4 +150,5 @@ margin: 2px;
 border: 1px solid #00AAFF;
 background-color: #BBDDFF;
 color: red;
+cursor: hand;
 }

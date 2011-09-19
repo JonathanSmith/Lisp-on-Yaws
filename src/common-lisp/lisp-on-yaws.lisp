@@ -2,11 +2,12 @@
 
 (defvar *yaws-server-node-name*)
 (defvar *cookie-file*)
-(defvar *yaws-listener-thread*)
+(defvar *yaws-listener-thread* nil)
 (defvar *pids-hash* (make-hash-table))
 (defvar *reg-pids-hash* (make-hash-table))
 (defvar *pid* (cleric:make-pid))
 (defvar *thread-pool* (thread-pool:make-thread-pool 6))
+
 
 (defun cleric::find-connected-remote-node (node-name)
   (flet ((node-name= (node-name1 node-name2)
@@ -68,6 +69,8 @@
 (defvar +file-atom+ (cleric:make-atom "file"))
 
 (defun resource-formatter (resource)
+  (setf resource (second resource))
+  
   (concatenate 'string 
 	       (apply #'concatenate 'string 
 		      (format nil "(~a ~a(" (first resource) (second resource))
@@ -81,7 +84,7 @@
   (let ((header (format nil "(defmodule ~a (export (out 1)))" module-name))
 	(include (format nil "(include-file \"include/yaws_api.lfe\")" ))
 	(gen-out (format nil "(gen_resources ~a ~a)" node-name (mapcar #'resource-formatter resources))))
-    (format t "~s~%" resources)
+    ;(format t "~s~%" resources)
     (format nil "~a~%~a~%~a~%" header include gen-out)))
 
 (defun send-file-for-compilation (module-name file-data)
@@ -189,11 +192,14 @@
 (defun add-appmod-resource (name resource)
   (let ((mod-description (gethash name *appmods* nil)))
     (if mod-description
-	(let* ((component-resource (assoc resource mod-description :test #'equalp))
-	       (mod-description2 (if component-resource
-				     (remove component-resource mod-description :test #'equalp)
-				     mod-description)))
-	  (setf (gethash name *appmods*) (push resource mod-description2)))
+	(let* ((component-resource (assoc (first resource) mod-description :test #'equalp)))
+	  ;(format t "A~s~%" component-resource)
+	  (let ((mod-description2 (if component-resource
+				      (remove (first component-resource) mod-description
+					      :test #'equalp
+					      :key #'car)  mod-description)))
+	    ;(format t "B~s~%" mod-description2)
+	    (setf (gethash name *appmods*) (push resource mod-description2))))
 	(setf (gethash name *appmods*) (list resource)))))
 
 (defun appmod-path-name-gen (appmod type path)
@@ -213,15 +219,24 @@
 					  (if (symbolp pathpart)
 					      (make-symbol (symbol-name pathpart))
 					      pathpart)) path))))
+    ;(format t "~s~%" module-resource)
 
     `(progn
-       (lisp-on-yaws:add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) ',module-resource)
+       (lisp-on-yaws:add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) 
+					 (list ,appname ',module-resource))
        (lisp-on-yaws:register ,appname
 			      (easy-handler ,args ,return-type ,@body)))))
   
 (defun generate-appmods ()
-  (maphash (lambda (mod resources)
-	     (let ((mod-string (apply #'write-module-string mod (cleric:this-node) resources)))
-	       (send-file-for-compilation mod mod-string)
-	       (add-appmod (cleric:tuple mod (cleric:make-atom mod)))))
-	   *appmods*))
+  (if *yaws-listener-thread*
+      (maphash (lambda (mod resources)
+		 (let ((mod-string (apply #'write-module-string mod (cleric:this-node) resources)))
+		   (send-file-for-compilation mod mod-string)
+		   (add-appmod (cleric:tuple mod (cleric:make-atom mod)))))
+	       *appmods*)))
+
+(defun %reset-appmod (name)
+  (setf (gethash name *appmods*) nil))
+
+(defmacro init-appmod (mod)
+    `(lisp-on-yaws::%reset-appmod ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod)))

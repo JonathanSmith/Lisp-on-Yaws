@@ -3,7 +3,8 @@
 
 (defpackage lisp-on-yaws
   (:use :common-lisp)
-  (:export 
+  (:export
+   #:init-appmod
    #:*yaws-server-node-name*
    #:*cookie-file*
    #:*pids-hash*
