@@ -6,7 +6,7 @@
 (defvar *pids-hash* (make-hash-table))
 (defvar *reg-pids-hash* (make-hash-table))
 (defvar *pid* (cleric:make-pid))
-(defvar *thread-pool* (thread-pool:make-thread-pool 6))
+(defvar *thread-pool* (thread-pool:make-thread-pool 100))
 
 
 (defun cleric::find-connected-remote-node (node-name)
@@ -40,7 +40,8 @@
       (thread-pool:add-to-pool 
        *thread-pool*
        (lambda ()
-	 (funcall fnlambda control-message))))))
+	 (funcall fnlambda control-message)))
+      )))
 
 (defmethod hash-dispatch ((control-message cleric:send))
   (let* ((to-pid (cleric:to-pid control-message))
@@ -48,7 +49,8 @@
     (when fnlambda 
       (thread-pool:add-to-pool
        *thread-pool*
-       (funcall fnlambda control-message)))))
+       (lambda ()
+	 (funcall fnlambda control-message))))))
 
 (defun set-hash-dispatch (fn)
   (let ((pid (cleric:make-pid)))
@@ -84,7 +86,6 @@
   (let ((header (format nil "(defmodule ~a (export (out 1)))" module-name))
 	(include (format nil "(include-file \"include/yaws_api.lfe\")" ))
 	(gen-out (format nil "(gen_resources ~a ~a)" node-name (mapcar #'resource-formatter resources))))
-    ;(format t "~s~%" resources)
     (format nil "~a~%~a~%~a~%" header include gen-out)))
 
 (defun send-file-for-compilation (module-name file-data)
@@ -111,6 +112,7 @@
 (defun reply (value &optional
 	      (reply-type *reply-type*)
 	      (mime-type *content-type*))
+  ;(format t "out:~s~%" (list *reply-type* *dest* *ref*))
   (if (eql reply-type :|content|)
       (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type mime-type value)))
       (cleric:send *dest* (cleric:tuple *ref* (cleric:tuple reply-type value)))))
@@ -156,7 +158,9 @@
 				 (prog1 `(,arg (when (> ,len ,i)  (map 'string #'code-char (elt *elements* ,i))))
 				   (incf i)))
 			     args)))
-	   ,@body))))
+	 ;(format t "in:~s~%" (list *reply-type* *dest* *ref*))
+
+	 ,@body))))
 
 (defmacro static-page-generator (((path-var filename-var) &rest args) &body body)
   (let ((page-result (gensym)))
@@ -193,12 +197,10 @@
   (let ((mod-description (gethash name *appmods* nil)))
     (if mod-description
 	(let* ((component-resource (assoc (first resource) mod-description :test #'equalp)))
-	  ;(format t "A~s~%" component-resource)
 	  (let ((mod-description2 (if component-resource
 				      (remove (first component-resource) mod-description
 					      :test #'equalp
 					      :key #'car)  mod-description)))
-	    ;(format t "B~s~%" mod-description2)
 	    (setf (gethash name *appmods*) (push resource mod-description2))))
 	(setf (gethash name *appmods*) (list resource)))))
 
@@ -219,7 +221,6 @@
 					  (if (symbolp pathpart)
 					      (make-symbol (symbol-name pathpart))
 					      pathpart)) path))))
-    ;(format t "~s~%" module-resource)
 
     `(progn
        (lisp-on-yaws:add-appmod-resource ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod) 

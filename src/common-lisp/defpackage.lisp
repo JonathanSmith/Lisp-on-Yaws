@@ -1,5 +1,5 @@
-(ql:quickload "thread-pool")
-(ql:quickload "cleric")
+(require :thread-pool)
+(require :cleric)
 
 (defpackage lisp-on-yaws
   (:use :common-lisp)
