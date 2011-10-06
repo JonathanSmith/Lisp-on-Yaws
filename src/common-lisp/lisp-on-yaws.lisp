@@ -40,8 +40,7 @@
       (thread-pool:add-to-pool 
        *thread-pool*
        (lambda ()
-	 (funcall fnlambda control-message)))
-      )))
+	 (funcall fnlambda control-message))))))
 
 (defmethod hash-dispatch ((control-message cleric:send))
   (let* ((to-pid (cleric:to-pid control-message))
