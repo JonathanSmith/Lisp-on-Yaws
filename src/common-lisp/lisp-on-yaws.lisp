@@ -6,7 +6,7 @@
 (defvar *pids-hash* (make-hash-table))
 (defvar *reg-pids-hash* (make-hash-table))
 (defvar *pid* (cleric:make-pid))
-(defvar *thread-pool* (thread-pool:make-thread-pool 100))
+(defvar *thread-pool* (thread-pool:make-thread-pool 10))
 
 
 (defun cleric::find-connected-remote-node (node-name)
@@ -40,7 +40,10 @@
       (thread-pool:add-to-pool 
        *thread-pool*
        (lambda ()
-	 (funcall fnlambda control-message))))))
+	 ;(format t "begin-~a~%" to-name)
+	 (funcall fnlambda control-message)
+	 ;(format t "end-~a~%" to-name)
+	 )))))
 
 (defmethod hash-dispatch ((control-message cleric:send))
   (let* ((to-pid (cleric:to-pid control-message))
@@ -142,6 +145,7 @@
   (let ((control-message (gensym "control-message"))
 	(len (gensym "len")))
     `(lambda (,control-message)
+       
        (let* ((*elements* (cleric:elements (cleric:message ,control-message)))
 	      (*type* (elt *elements* 0))
 	      (*dest* (elt *elements* 1))
@@ -157,7 +161,7 @@
 				 (prog1 `(,arg (when (> ,len ,i)  (map 'string #'code-char (elt *elements* ,i))))
 				   (incf i)))
 			     args)))
-	 ;(format t "in:~s~%" (list *reply-type* *dest* *ref*))
+	 ,@(when args `((escape ,@args)))
 
 	 ,@body))))
 
@@ -240,3 +244,16 @@
 
 (defmacro init-appmod (mod)
     `(lisp-on-yaws::%reset-appmod ,(if (symbolp mod) (string-downcase (symbol-name mod)) mod)))
+
+(defmacro bind-query (query-bind pairlist &body body)
+    (let ((q (or (first query-bind) (gensym "q"))))
+      `(let* ((,q (parse-query lisp-on-yaws::*query*)))
+	 (let ,(mapcar (lambda (pair)
+			 (let ((symbol (first pair))
+			       (string (second pair)))
+			   `(,symbol (second (assoc ,string ,q :test #'string=))))) pairlist)
+	   (escape ,@(mapcar #'first pairlist))
+	   ,@body))))
+
+(defmacro escape (&rest vars)
+  `(progn ,@(mapcar (lambda (var) `(setf ,var (cl-who:escape-string-iso-8859-1 ,var))) vars)))

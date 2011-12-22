@@ -110,10 +110,25 @@
   rlist
   data)
 
+;(defrecord node
+;    node)
+
+;(defun create-resource (resource)
+;  (: mnesia create_table resource '(#(attributes (node)))))
+
+;(defun get-registered-node (resource)
+;  (case (: mnesia read resource 'node)
+;    ('abort nil)
+;    (node-list 
+;     (: lists nth 
+;	(- (: random uniform (length node-list)) 1) node-list))))
+
+;(defun add-registered-node (resource node)
+ ; (: mnesia write resource (make-node node node)))
+
 (eval-when-compile
   (defun make-resource-bodies (X node)
     (let* (([resource method path] X))
-      ;(: io format '"~p~n" (list X))
       (case path 
 	('*? `([arg ',method fullpath]
 		    (let* ((to (tuple ',resource ',node))
@@ -298,9 +313,6 @@
 
   ([A B C]
       (: io format '"error? ~p ~p ~p~n" (list A B C))))
-
-
-
 
 (defun receive-loop (ref)
   (receive ((tuple ref pid 'ping)

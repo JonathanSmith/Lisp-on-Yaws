@@ -1,9 +1,12 @@
 (require :thread-pool)
 (require :cleric)
+(require :cl-who)
 
 (defpackage lisp-on-yaws
   (:use :common-lisp)
   (:export
+   #:bind-query
+   #:escape
    #:init-appmod
    #:*yaws-server-node-name*
    #:*cookie-file*
