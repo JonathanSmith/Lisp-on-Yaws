@@ -2,6 +2,9 @@ body {
   font-family: Georgia, "Times New Roman",
         Times, serif; }
 
+input {
+ height: 24px;}
+
 ul.navbar {
   background-color: #BBD2FF;
   list-style-type: none;

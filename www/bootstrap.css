@@ -633,7 +633,7 @@ select,
 .uneditable-input {
   display: inline-block;
   width: 210px;
-  height: 18px;
+  height: 24px;
   padding: 4px;
   font-size: 13px;
   line-height: 18px;
