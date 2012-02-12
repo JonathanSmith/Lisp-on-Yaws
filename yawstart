@@ -1,1 +1,1 @@
-erl -sname yaws -setcookie foo -pa $PWD/lfe/ebin $PWD/yaws/ebin $PWD/ebin $PWD/include 
+erl -sname yaws -setcookie $(cat $PWD/COOKIE) -pa $PWD/lfe/ebin $PWD/yaws/ebin $PWD/ebin $PWD/include
