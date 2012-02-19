@@ -40,10 +40,7 @@
       (thread-pool:add-to-pool 
        *thread-pool*
        (lambda ()
-	 ;(format t "begin-~a~%" to-name)
-	 (funcall fnlambda control-message)
-	 ;(format t "end-~a~%" to-name)
-	 )))))
+	 (funcall fnlambda control-message))))))
 
 (defmethod hash-dispatch ((control-message cleric:send))
   (let* ((to-pid (cleric:to-pid control-message))
